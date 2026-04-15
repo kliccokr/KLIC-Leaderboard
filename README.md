@@ -2,6 +2,10 @@
 
 KLIC 조직 내 Claude Code 사용량을 추적하고 랭킹을 제공하는 내부 플랫폼입니다.
 
+<p align="center">
+  <img src="docs/dashboard.png" alt="KLIC Leaderboard Dashboard" width="720" />
+</p>
+
 ## 기능
 
 - **리더보드** — 토큰 사용량 기준 개인/팀 랭킹 (일별 중복 제거)
