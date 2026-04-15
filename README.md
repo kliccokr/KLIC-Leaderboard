@@ -42,7 +42,7 @@ bun run dev
 ## CLI 설치
 
 ```bash
-curl -fsSL https://use.klic.co.kr/cli/install.sh | bash
+curl -fsSL https://example.com/cli/install.sh | bash
 klic-leaderboard login
 klic-leaderboard daemon    # 백그라운드 실행
 ```
