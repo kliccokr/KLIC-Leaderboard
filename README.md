@@ -55,4 +55,4 @@ docker compose up --build -d web
 
 ## 라이선스
 
-Internal use only. KLIC.
+[MIT](LICENSE)
