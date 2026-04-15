@@ -1,0 +1,788 @@
+#!/usr/bin/env node
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// src/config.ts
+var import_fs = require("fs");
+var import_path = require("path");
+var import_os = __toESM(require("os"));
+var CONFIG_PATH = (0, import_path.join)(import_os.default.homedir(), ".klic", "leaderboard", "config.json");
+function readConfig() {
+  if (!(0, import_fs.existsSync)(CONFIG_PATH)) return null;
+  try {
+    return JSON.parse((0, import_fs.readFileSync)(CONFIG_PATH, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+function writeConfig(config) {
+  const dir = (0, import_path.dirname)(CONFIG_PATH);
+  (0, import_fs.mkdirSync)(dir, { recursive: true });
+  (0, import_fs.writeFileSync)(CONFIG_PATH, JSON.stringify(config, null, 2), { mode: 384 });
+}
+
+// src/commands/login.ts
+var readline = __toESM(require("readline/promises"));
+var DEFAULT_SERVER = process.env.KLIC_SERVER_URL ?? "https://use.klic.co.kr";
+async function loginCommand() {
+  console.log(`
+\u{1F511} KLIC Leaderboard Login`);
+  console.log(`
+Open this URL in your browser to get an API key:`);
+  console.log(`
+  ${DEFAULT_SERVER}/ko/settings
+`);
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const apiKey = await rl.question("Paste your API key here: ");
+  rl.close();
+  if (!apiKey.startsWith("klic_")) {
+    console.error("\u274C Invalid API key format. Should start with 'klic_'");
+    process.exit(1);
+  }
+  writeConfig({ apiKey: apiKey.trim(), serverUrl: DEFAULT_SERVER });
+  console.log("\u2705 Logged in! Run 'klic-leaderboard' to submit your usage.");
+}
+
+// src/lib/pricing.ts
+var fs = __toESM(require("fs"));
+var path = __toESM(require("path"));
+var os2 = __toESM(require("os"));
+var LITELLM_PRICING_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
+var CACHE_TTL_MS = 24 * 60 * 60 * 1e3;
+var FETCH_TIMEOUT_MS = 5e3;
+var FALLBACK_PRICING = {
+  "opus-4": { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+  "sonnet-4": { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+  haiku: { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
+  default: { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 }
+};
+var pricingData = null;
+function getCacheFilePath() {
+  const configDir = process.platform === "win32" ? path.join(
+    process.env.APPDATA || path.join(os2.homedir(), "AppData", "Roaming"),
+    "klic-leaderboard"
+  ) : path.join(os2.homedir(), ".config", "klic-leaderboard");
+  return path.join(configDir, "pricing-cache.json");
+}
+function loadCache() {
+  try {
+    const cachePath = getCacheFilePath();
+    if (!fs.existsSync(cachePath)) return null;
+    const raw = fs.readFileSync(cachePath, "utf-8");
+    const cache = JSON.parse(raw);
+    if (Date.now() - cache.fetchedAt > CACHE_TTL_MS) return null;
+    if (!cache.models || Object.keys(cache.models).length === 0) return null;
+    return cache;
+  } catch {
+    return null;
+  }
+}
+function saveCache(models) {
+  try {
+    const cachePath = getCacheFilePath();
+    const cacheDir = path.dirname(cachePath);
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true });
+    }
+    const cache = {
+      fetchedAt: Date.now(),
+      models
+    };
+    fs.writeFileSync(cachePath, JSON.stringify(cache), "utf-8");
+  } catch {
+  }
+}
+function extractClaudePricing(rawData) {
+  const result = {};
+  for (const [key, value] of Object.entries(rawData)) {
+    if (!key.startsWith("claude-")) continue;
+    const inputCostPerToken = value.input_cost_per_token;
+    const outputCostPerToken = value.output_cost_per_token;
+    if (inputCostPerToken == null || outputCostPerToken == null) continue;
+    const input = inputCostPerToken * 1e6;
+    const output = outputCostPerToken * 1e6;
+    const cacheWritePerToken = value.cache_creation_input_token_cost;
+    const cacheReadPerToken = value.cache_read_input_token_cost;
+    const cacheWrite = cacheWritePerToken != null ? cacheWritePerToken * 1e6 : input * 1.25;
+    const cacheRead = cacheReadPerToken != null ? cacheReadPerToken * 1e6 : input * 0.1;
+    const pricing = {
+      input: Math.round(input * 1e3) / 1e3,
+      output: Math.round(output * 1e3) / 1e3,
+      cacheWrite: Math.round(cacheWrite * 1e3) / 1e3,
+      cacheRead: Math.round(cacheRead * 1e3) / 1e3
+    };
+    result[key] = pricing;
+    const withoutDate = key.replace(/-\d{8}$/, "");
+    if (withoutDate !== key && !result[withoutDate]) {
+      result[withoutDate] = pricing;
+    }
+    const withoutVersion = key.replace(/-v\d+:\d+$/, "").replace(/-\d{8}$/, "");
+    if (withoutVersion !== key && withoutVersion !== withoutDate && !result[withoutVersion]) {
+      result[withoutVersion] = pricing;
+    }
+  }
+  return result;
+}
+async function initPricing() {
+  if (pricingData) return;
+  const cached = loadCache();
+  if (cached) {
+    pricingData = cached.models;
+    return;
+  }
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const response = await fetch(LITELLM_PRICING_URL, {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (response.ok) {
+      const rawData = await response.json();
+      const extracted = extractClaudePricing(rawData);
+      if (Object.keys(extracted).length > 0) {
+        pricingData = extracted;
+        saveCache(extracted);
+        return;
+      }
+    }
+  } catch {
+  }
+  pricingData = null;
+}
+function matchModel(model) {
+  if (pricingData) {
+    if (pricingData[model]) {
+      return pricingData[model];
+    }
+    const withoutDate = model.replace(/-\d{8}$/, "");
+    if (pricingData[withoutDate]) {
+      return pricingData[withoutDate];
+    }
+    const withoutVersion = model.replace(/-v\d+:\d+$/, "").replace(/-\d{8}$/, "");
+    if (pricingData[withoutVersion]) {
+      return pricingData[withoutVersion];
+    }
+    const modelLower2 = model.toLowerCase();
+    let bestMatch = null;
+    for (const [key, pricing] of Object.entries(pricingData)) {
+      if (modelLower2.startsWith(key.toLowerCase()) || key.toLowerCase().startsWith(modelLower2.replace(/-\d{8}$/, ""))) {
+        if (!bestMatch || key.length > bestMatch.key.length) {
+          bestMatch = { key, pricing };
+        }
+      }
+    }
+    if (bestMatch) {
+      return bestMatch.pricing;
+    }
+  }
+  const modelLower = model.toLowerCase();
+  if (modelLower.includes("opus")) return FALLBACK_PRICING["opus-4"];
+  if (modelLower.includes("haiku")) return FALLBACK_PRICING["haiku"];
+  if (modelLower.includes("sonnet")) return FALLBACK_PRICING["sonnet-4"];
+  return FALLBACK_PRICING["default"];
+}
+function estimateCost(model, inputTokens, outputTokens, cacheCreationTokens = 0, cacheReadTokens = 0) {
+  const price = matchModel(model);
+  const inputCost = inputTokens / 1e6 * price.input;
+  const outputCost = outputTokens / 1e6 * price.output;
+  const cacheWriteCost = cacheCreationTokens / 1e6 * price.cacheWrite;
+  const cacheReadCost = cacheReadTokens / 1e6 * price.cacheRead;
+  return Math.round((inputCost + outputCost + cacheWriteCost + cacheReadCost) * 100) / 100;
+}
+
+// src/lib/scanner.ts
+var fs2 = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
+var os3 = __toESM(require("os"));
+var crypto = __toESM(require("crypto"));
+
+// ../shared/src/classifier.ts
+var EDIT_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "FileEditTool", "FileWriteTool", "NotebookEdit"]);
+var READ_TOOLS = /* @__PURE__ */ new Set(["Read", "Grep", "Glob", "FileReadTool", "GrepTool", "GlobTool"]);
+var BASH_TOOLS = /* @__PURE__ */ new Set(["Bash", "BashTool", "PowerShellTool"]);
+var TASK_TOOLS = /* @__PURE__ */ new Set(["TaskCreate", "TaskUpdate", "TaskGet", "TaskList", "TaskOutput", "TaskStop", "TodoWrite"]);
+var SEARCH_TOOLS = /* @__PURE__ */ new Set(["WebSearch", "WebFetch", "ToolSearch"]);
+var TEST_PATTERNS = /\b(test|pytest|vitest|jest|mocha|spec|coverage|npm\s+test|npx\s+vitest|npx\s+jest)\b/i;
+var GIT_PATTERNS = /\bgit\s+(push|pull|commit|merge|rebase|checkout|branch|stash|log|diff|status|add|reset|cherry-pick|tag)\b/i;
+var BUILD_PATTERNS = /\b(npm\s+run\s+build|npm\s+publish|pip\s+install|docker|deploy|make\s+build|npm\s+run\s+dev|npm\s+start|pm2|systemctl|brew|cargo\s+build)\b/i;
+var INSTALL_PATTERNS = /\b(npm\s+install|pip\s+install|brew\s+install|apt\s+install|cargo\s+add)\b/i;
+var DEBUG_KEYWORDS = /\b(fix|bug|error|broken|failing|crash|issue|debug|traceback|exception|stack\s*trace|not\s+working|wrong|unexpected)\b/i;
+var FEATURE_KEYWORDS = /\b(add|create|implement|new|build|feature|introduce|set\s*up|scaffold|generate)\b/i;
+var REFACTOR_KEYWORDS = /\b(refactor|clean\s*up|rename|reorganize|simplify|extract|restructure|move|migrate|split)\b/i;
+var BRAINSTORM_KEYWORDS = /\b(brainstorm|idea|what\s+if|explore|think\s+about|approach|strategy|design|consider|how\s+should|what\s+would|opinion|suggest|recommend)\b/i;
+var RESEARCH_KEYWORDS = /\b(research|investigate|look\s+into|find\s+out|check|search|analyze|review|understand|explain|how\s+does|what\s+is|show\s+me|list|compare)\b/i;
+function hasTool(names, set) {
+  return names.some((n) => set.has(n));
+}
+function hasMcp(names) {
+  return names.some((n) => n.startsWith("mcp__"));
+}
+function matchesAny(text, ...patterns) {
+  return patterns.some((p) => p.test(text));
+}
+function classifyByToolPattern(input) {
+  const { toolNames, bashCommands } = input;
+  if (toolNames.includes("EnterPlanMode")) return "planning";
+  if (toolNames.includes("Agent")) return "delegation";
+  const hasEdit = hasTool(toolNames, EDIT_TOOLS);
+  const hasRead = hasTool(toolNames, READ_TOOLS);
+  const hasBash = hasTool(toolNames, BASH_TOOLS);
+  const hasSearch = hasTool(toolNames, SEARCH_TOOLS);
+  const hasTask = hasTool(toolNames, TASK_TOOLS);
+  const isMcp = hasMcp(toolNames);
+  if (hasBash && !hasEdit) {
+    const bashText = bashCommands.join(" ");
+    if (TEST_PATTERNS.test(bashText)) return "testing";
+    if (GIT_PATTERNS.test(bashText)) return "git";
+    if (matchesAny(bashText, BUILD_PATTERNS, INSTALL_PATTERNS)) return "build/deploy";
+  }
+  if (hasEdit) return "coding";
+  if (hasBash && hasRead) return "exploration";
+  if (hasBash) return "coding";
+  if (hasSearch || isMcp) return "exploration";
+  if (hasRead) return "exploration";
+  if (hasTask) return "planning";
+  if (toolNames.includes("Skill")) return "general";
+  return null;
+}
+function refineByKeywords(toolResult, userMessage) {
+  if (toolResult === "coding") {
+    if (DEBUG_KEYWORDS.test(userMessage)) return "debugging";
+    if (REFACTOR_KEYWORDS.test(userMessage)) return "refactoring";
+    if (FEATURE_KEYWORDS.test(userMessage)) return "feature";
+    return "coding";
+  }
+  if (toolResult === "exploration") {
+    if (DEBUG_KEYWORDS.test(userMessage)) return "debugging";
+    return "exploration";
+  }
+  return toolResult;
+}
+function classifyConversation(userMessage) {
+  if (BRAINSTORM_KEYWORDS.test(userMessage)) return "brainstorming";
+  if (RESEARCH_KEYWORDS.test(userMessage)) return "exploration";
+  if (DEBUG_KEYWORDS.test(userMessage)) return "debugging";
+  if (FEATURE_KEYWORDS.test(userMessage)) return "feature";
+  return "conversation";
+}
+function classifyTurn(input) {
+  const toolResult = classifyByToolPattern(input);
+  if (toolResult) return refineByKeywords(toolResult, input.userMessage);
+  return classifyConversation(input.userMessage);
+}
+
+// src/lib/scanner.ts
+function getClaudeProjectsDirs() {
+  const dirs = [];
+  const home = os3.homedir();
+  const configDir = process.env.CLAUDE_CONFIG_DIR;
+  if (configDir) {
+    dirs.push(path2.join(configDir, "projects"));
+  }
+  if (process.platform === "win32") {
+    const appData = process.env.APPDATA;
+    if (appData) {
+      dirs.push(path2.join(appData, "claude", "projects"));
+    }
+  }
+  dirs.push(path2.join(home, ".config", "claude", "projects"));
+  dirs.push(path2.join(home, ".claude", "projects"));
+  return [...new Set(dirs)].filter((dir) => fs2.existsSync(dir));
+}
+function findJsonlFiles(dir) {
+  const files = [];
+  try {
+    const entries = fs2.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path2.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...findJsonlFiles(fullPath));
+      } else if (entry.name.endsWith(".jsonl")) {
+        files.push(fullPath);
+      }
+    }
+  } catch {
+  }
+  return files;
+}
+function extractSessionId(filePath) {
+  let fd = null;
+  try {
+    fd = fs2.openSync(filePath, "r");
+    const buf = Buffer.alloc(4096);
+    const bytesRead = fs2.readSync(fd, buf, 0, 4096, 0);
+    if (bytesRead === 0) return null;
+    const firstLine = buf.toString("utf-8", 0, bytesRead).split("\n")[0];
+    if (!firstLine.trim()) return null;
+    const event = JSON.parse(firstLine);
+    if (event.sessionId) return event.sessionId;
+    return crypto.createHash("sha256").update(firstLine).digest("hex");
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) fs2.closeSync(fd);
+  }
+}
+function getOrCreateSourceId() {
+  const filePath = path2.join(os3.homedir(), ".claude", "klic-source-id");
+  try {
+    if (fs2.existsSync(filePath)) {
+      const existing = fs2.readFileSync(filePath, "utf-8").trim();
+      if (existing.length > 0) return existing;
+    }
+  } catch {
+  }
+  const id = crypto.randomUUID();
+  try {
+    fs2.writeFileSync(filePath, id, "utf-8");
+  } catch {
+  }
+  return id;
+}
+function readRateLimits() {
+  const filePath = path2.join(os3.homedir(), ".claude", "rate-limits.json");
+  try {
+    if (!fs2.existsSync(filePath)) return null;
+    const raw = fs2.readFileSync(filePath, "utf-8");
+    const data = JSON.parse(raw);
+    const fiveHourPct = data?.rate_limits?.five_hour?.used_percentage ?? null;
+    const sevenDayPct = data?.rate_limits?.seven_day?.used_percentage ?? null;
+    const timestamp = data?.timestamp ?? null;
+    if (fiveHourPct === null && sevenDayPct === null) return null;
+    return {
+      fiveHourUsedPct: fiveHourPct !== null ? Number(fiveHourPct) : null,
+      sevenDayUsedPct: sevenDayPct !== null ? Number(sevenDayPct) : null,
+      updatedAt: timestamp
+    };
+  } catch {
+    return null;
+  }
+}
+function getSessionPathDebugInfo() {
+  const home = os3.homedir();
+  const pathsToCheck = [
+    path2.join(home, ".config", "claude", "projects"),
+    path2.join(home, ".claude", "projects")
+  ];
+  if (process.env.CLAUDE_CONFIG_DIR) {
+    pathsToCheck.unshift(path2.join(process.env.CLAUDE_CONFIG_DIR, "projects"));
+  }
+  if (process.platform === "win32" && process.env.APPDATA) {
+    pathsToCheck.unshift(path2.join(process.env.APPDATA, "claude", "projects"));
+  }
+  return {
+    searchedPaths: pathsToCheck.map((p) => ({ path: p, exists: fs2.existsSync(p) })),
+    platform: process.platform
+  };
+}
+function scanAllProjects(options = {}) {
+  const projectsDirs = options._projectsDirsOverride ?? getClaudeProjectsDirs();
+  if (projectsDirs.length === 0) return null;
+  const days = options.days ?? 0;
+  let cutoffDate = null;
+  if (days > 0) {
+    const cutoff = /* @__PURE__ */ new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    cutoff.setHours(0, 0, 0, 0);
+    cutoffDate = cutoff.toISOString();
+  }
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalCacheCreation = 0;
+  let totalCacheRead = 0;
+  let totalCost = 0;
+  const models = {};
+  const dailyData = {};
+  let firstTimestamp = null;
+  let lastTimestamp = null;
+  let totalLinesAdded = 0;
+  let totalLinesRemoved = 0;
+  let totalCommits = 0;
+  let totalPRs = 0;
+  let totalActiveTimeSecs = 0;
+  const sessionsList = [];
+  const SKIP_DIR_PATTERNS = ["claude-mem", "observer-session"];
+  const rawJsonlFiles = [];
+  for (const projectsDir of projectsDirs) {
+    try {
+      const entries = fs2.readdirSync(projectsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+        if (SKIP_DIR_PATTERNS.some((p) => entry.name.includes(p.replace(/\//g, "-")))) continue;
+        const files = findJsonlFiles(path2.join(projectsDir, entry.name));
+        for (const f of files) rawJsonlFiles.push({ filePath: f, projectDirName: entry.name });
+      }
+    } catch {
+      continue;
+    }
+  }
+  const sessionFileMap = /* @__PURE__ */ new Map();
+  const noIdFiles = [];
+  for (const { filePath, projectDirName } of rawJsonlFiles) {
+    const sessionId = extractSessionId(filePath);
+    if (!sessionId) {
+      noIdFiles.push({ filePath, projectDirName });
+      continue;
+    }
+    let mtimeMs = 0;
+    try {
+      mtimeMs = fs2.statSync(filePath).mtimeMs;
+    } catch {
+    }
+    const existing = sessionFileMap.get(sessionId);
+    if (!existing || mtimeMs > existing.mtimeMs) {
+      sessionFileMap.set(sessionId, { filePath, projectDirName, mtimeMs });
+    }
+  }
+  const allJsonlEntries = [
+    ...Array.from(sessionFileMap.entries()).map(([, v]) => ({ filePath: v.filePath, projectDirName: v.projectDirName })),
+    ...noIdFiles
+  ];
+  if (allJsonlEntries.length === 0) return null;
+  const { onProgress } = options;
+  for (let i = 0; i < allJsonlEntries.length; i++) {
+    const { filePath, projectDirName } = allJsonlEntries[i];
+    const decodedPath = projectDirName.replace(/^-/, "/").replace(/-/g, "/");
+    const projectName = decodedPath.split("/").filter(Boolean).pop() ?? projectDirName;
+    const sessionId = extractSessionId(filePath) ?? path2.basename(filePath, ".jsonl");
+    try {
+      const content = fs2.readFileSync(filePath, "utf-8");
+      const lines = content.split("\n").filter((line) => line.trim());
+      let sesInputTokens = 0;
+      let sesOutputTokens = 0;
+      let sesCacheCreation = 0;
+      let sesCacheRead = 0;
+      let sesCost = 0;
+      let sesTurns = 0;
+      let sesFirstTs = null;
+      let sesLastTs = null;
+      const sesModels = {};
+      const sesToolCounts = {};
+      const sesTaskCategories = {};
+      let currentUserMessage = "";
+      let currentTurnToolNames = [];
+      let currentTurnBashCommands = [];
+      for (const line of lines) {
+        try {
+          const event = JSON.parse(line);
+          if (event.type === "user") {
+            const msg = event.message?.content;
+            if (typeof msg === "string") currentUserMessage = msg;
+            else if (Array.isArray(msg)) currentUserMessage = msg.map((b) => b.text ?? "").join("");
+          }
+          if (event.type === "assistant" && event.message?.usage) {
+            if ((event.message.model || "") === "<synthetic>") continue;
+            if (cutoffDate && event.timestamp && event.timestamp < cutoffDate) continue;
+            const usage = event.message.usage;
+            const model = event.message.model || "unknown";
+            const inputTokens = usage.input_tokens || 0;
+            const outputTokens = usage.output_tokens || 0;
+            const cacheCreation = usage.cache_creation_input_tokens || 0;
+            const cacheRead = usage.cache_read_input_tokens || 0;
+            totalInputTokens += inputTokens;
+            totalOutputTokens += outputTokens;
+            totalCacheCreation += cacheCreation;
+            totalCacheRead += cacheRead;
+            sesInputTokens += inputTokens;
+            sesOutputTokens += outputTokens;
+            sesCacheCreation += cacheCreation;
+            sesCacheRead += cacheRead;
+            sesTurns++;
+            const messageCost = estimateCost(model, inputTokens, outputTokens, cacheCreation, cacheRead);
+            totalCost += messageCost;
+            sesCost += messageCost;
+            const messageTokens = inputTokens + outputTokens + cacheCreation + cacheRead;
+            models[model] = (models[model] || 0) + messageTokens;
+            sesModels[model] = (sesModels[model] || 0) + messageTokens;
+            if (event.timestamp) {
+              const date = new Date(event.timestamp).toISOString().split("T")[0];
+              if (!dailyData[date]) {
+                dailyData[date] = {
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  cacheCreationTokens: 0,
+                  cacheReadTokens: 0,
+                  totalTokens: 0,
+                  cost: 0,
+                  models: {}
+                };
+              }
+              const day = dailyData[date];
+              day.inputTokens += inputTokens;
+              day.outputTokens += outputTokens;
+              day.cacheCreationTokens += cacheCreation;
+              day.cacheReadTokens += cacheRead;
+              day.totalTokens += messageTokens;
+              day.cost += messageCost;
+              day.models[model] = (day.models[model] || 0) + messageTokens;
+              if (!firstTimestamp || event.timestamp < firstTimestamp) firstTimestamp = event.timestamp;
+              if (!lastTimestamp || event.timestamp > lastTimestamp) lastTimestamp = event.timestamp;
+              if (!sesFirstTs || event.timestamp < sesFirstTs) sesFirstTs = event.timestamp;
+              if (!sesLastTs || event.timestamp > sesLastTs) sesLastTs = event.timestamp;
+            }
+            const contentBlocks = event.message?.content;
+            if (Array.isArray(contentBlocks)) {
+              for (const block of contentBlocks) {
+                if (block.type !== "tool_use" && block.type !== "server_tool_use") continue;
+                const toolName = block.type === "server_tool_use" ? `mcp__${block.name}` : block.name;
+                sesToolCounts[toolName] = (sesToolCounts[toolName] ?? 0) + 1;
+                if (block.name === "Bash") {
+                  const cmd = block.input?.command ?? "";
+                  if (/\bgit\s+commit\b/.test(cmd)) totalCommits++;
+                  if (/\bgh\s+pr\s+create\b/.test(cmd)) totalPRs++;
+                  currentTurnBashCommands.push(cmd);
+                } else if (block.name === "Write") {
+                  const fileContent = block.input?.content ?? "";
+                  totalLinesAdded += fileContent.split("\n").length;
+                } else if (block.name === "Edit" || block.name === "MultiEdit") {
+                  const edits = block.name === "MultiEdit" ? block.input?.edits ?? [] : [block.input];
+                  for (const edit of edits) {
+                    if (!edit) continue;
+                    const oldStr = edit.old_string ?? "";
+                    const newStr = edit.new_string ?? "";
+                    totalLinesAdded += newStr ? newStr.split("\n").length : 0;
+                    totalLinesRemoved += oldStr ? oldStr.split("\n").length : 0;
+                  }
+                }
+                currentTurnToolNames.push(toolName);
+              }
+            }
+            if (currentTurnToolNames.length > 0) {
+              const category = classifyTurn({
+                toolNames: currentTurnToolNames,
+                bashCommands: currentTurnBashCommands,
+                userMessage: currentUserMessage
+              });
+              sesTaskCategories[category] = (sesTaskCategories[category] ?? 0) + 1;
+              currentTurnToolNames = [];
+              currentTurnBashCommands = [];
+              currentUserMessage = "";
+            }
+          }
+        } catch {
+        }
+      }
+      if (sesFirstTs && sesLastTs) {
+        const diffSecs = Math.round(
+          (new Date(sesLastTs).getTime() - new Date(sesFirstTs).getTime()) / 1e3
+        );
+        if (diffSecs > 0) totalActiveTimeSecs += diffSecs;
+      }
+      const sesTotalTokens = sesInputTokens + sesOutputTokens + sesCacheCreation + sesCacheRead;
+      if (sesTotalTokens > 0) {
+        sessionsList.push({
+          sessionId,
+          projectName,
+          totalTokens: sesTotalTokens,
+          totalCost: Math.round(sesCost * 1e4) / 1e4,
+          inputTokens: sesInputTokens,
+          outputTokens: sesOutputTokens,
+          cacheCreationTokens: sesCacheCreation,
+          cacheReadTokens: sesCacheRead,
+          modelsUsed: Object.keys(sesModels),
+          turnsCount: sesTurns,
+          sessionStart: sesFirstTs,
+          sessionEnd: sesLastTs,
+          toolCounts: sesToolCounts,
+          taskCategories: sesTaskCategories
+        });
+      }
+    } catch {
+    }
+    if (onProgress) {
+      onProgress(i + 1, allJsonlEntries.length);
+    }
+  }
+  const totalTokens = totalInputTokens + totalOutputTokens + totalCacheCreation + totalCacheRead;
+  if (totalTokens === 0) return null;
+  const dailyBreakdown = Object.entries(dailyData).map(([date, data]) => ({
+    date,
+    inputTokens: data.inputTokens,
+    outputTokens: data.outputTokens,
+    cacheCreationTokens: data.cacheCreationTokens,
+    cacheReadTokens: data.cacheReadTokens,
+    totalTokens: data.totalTokens,
+    totalCost: Math.round(data.cost * 100) / 100,
+    modelsUsed: Object.keys(data.models)
+  })).sort((a, b) => a.date.localeCompare(b.date));
+  const activity = {
+    sessionsCount: allJsonlEntries.length,
+    linesAdded: totalLinesAdded,
+    linesRemoved: totalLinesRemoved,
+    commitsCount: totalCommits,
+    pullRequestsCount: totalPRs,
+    activeTimeSecs: totalActiveTimeSecs
+  };
+  const rateLimits = readRateLimits() ?? void 0;
+  const source = getOrCreateSourceId();
+  const hostname2 = os3.hostname();
+  return {
+    totalTokens,
+    totalCost: Math.round(totalCost * 100) / 100,
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
+    cacheCreationTokens: totalCacheCreation,
+    cacheReadTokens: totalCacheRead,
+    modelsUsed: Object.keys(models),
+    dailyBreakdown,
+    dateRange: {
+      start: firstTimestamp ? new Date(firstTimestamp).toISOString().split("T")[0] : "1970-01-01",
+      end: lastTimestamp ? new Date(lastTimestamp).toISOString().split("T")[0] : "1970-01-01"
+    },
+    activity,
+    sessions: sessionsList,
+    rateLimits,
+    source,
+    hostname: hostname2
+  };
+}
+
+// src/commands/submit.ts
+async function submitCommand() {
+  const config = readConfig();
+  if (!config) {
+    console.error("Not logged in. Run: klic-leaderboard login");
+    process.exit(1);
+  }
+  console.log("Initializing pricing data...");
+  await initPricing();
+  console.log("Scanning Claude Code usage data...");
+  const scanResult = scanAllProjects();
+  if (!scanResult) {
+    console.error("No Claude Code usage data found.");
+    console.error("Make sure you have used Claude Code in at least one project.");
+    const debug = getSessionPathDebugInfo();
+    console.error("Searched paths:");
+    for (const p of debug.searchedPaths) {
+      console.error(`  ${p.path} (${p.exists ? "exists" : "not found"})`);
+    }
+    process.exit(1);
+  }
+  console.log(
+    `Found ${scanResult.totalTokens.toLocaleString()} tokens across ${scanResult.dailyBreakdown.length} days.`
+  );
+  console.log("Submitting to KLIC Leaderboard...");
+  const body = JSON.stringify(scanResult);
+  const res = await fetch(`${config.serverUrl}/api/submit`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`
+    },
+    body
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    console.error(`Submission failed: ${err.error ?? res.statusText}`);
+    process.exit(1);
+  }
+  const result = await res.json();
+  console.log(`Submitted! Your level: ${result.level ?? "unknown"}`);
+  console.log(`View rankings: ${config.serverUrl}`);
+}
+
+// src/commands/status.ts
+async function statusCommand() {
+  const config = readConfig();
+  if (!config) {
+    console.log("\u274C Not logged in. Run: klic-leaderboard login");
+    return;
+  }
+  const res = await fetch(`${config.serverUrl}/api/api-keys`, {
+    headers: { Authorization: `Bearer ${config.apiKey}` }
+  }).catch(() => null);
+  if (!res?.ok) {
+    console.log("\u274C Cannot reach KLIC server or invalid API key.");
+    return;
+  }
+  const data = await res.json();
+  console.log(`
+\u{1F4CA} KLIC Leaderboard Status`);
+  console.log(`API Key: ${data.hasKey ? "Active" : "Not found"}`);
+  console.log(`Last Used: ${data.lastUsedAt ?? "Never"}`);
+  console.log(`
+\u{1F3C6} View rankings: ${config.serverUrl}`);
+}
+
+// src/commands/daemon.ts
+var INTERVAL_MS = 30 * 60 * 1e3;
+var isShuttingDown = false;
+async function daemonCommand() {
+  console.log("[KLIC] Daemon started. Submitting every 30 minutes. Press Ctrl+C to stop.");
+  await runSubmit();
+  const timer = setInterval(() => {
+    if (!isShuttingDown) runSubmit();
+  }, INTERVAL_MS);
+  const cleanup = () => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    console.log("\n[KLIC] Daemon stopped.");
+    clearInterval(timer);
+    process.exitCode = 0;
+  };
+  process.on("SIGINT", cleanup);
+  process.on("SIGTERM", cleanup);
+  process.on("SIGHUP", cleanup);
+}
+async function runSubmit() {
+  if (isShuttingDown) return;
+  const ts = (/* @__PURE__ */ new Date()).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+  console.log(`
+[${ts}] Submitting...`);
+  const originalExit = process.exit;
+  process.exit = (() => {
+    throw new Error("process.exit intercepted");
+  });
+  try {
+    await submitCommand();
+    console.log(`[${(/* @__PURE__ */ new Date()).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}] Done.`);
+  } catch (err) {
+    console.error(`[${(/* @__PURE__ */ new Date()).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}] Failed:`, err instanceof Error ? err.message : err);
+  } finally {
+    process.exit = originalExit;
+  }
+}
+
+// src/index.ts
+var command = process.argv[2];
+async function main() {
+  switch (command) {
+    case "login":
+      await loginCommand();
+      break;
+    case "status":
+      await statusCommand();
+      break;
+    case "daemon":
+      await daemonCommand();
+      break;
+    default:
+      await submitCommand();
+  }
+}
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

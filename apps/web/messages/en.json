@@ -1,0 +1,82 @@
+{
+  "nav": {
+    "leaderboard": "Leaderboard",
+    "profile": "Profile",
+    "admin": "Admin",
+    "logout": "Logout",
+    "login": "Login",
+    "dashboard": "My Dashboard"
+  },
+  "leaderboard": {
+    "title": "KLIC Leaderboard",
+    "subtitle": "Claude Code Usage Rankings",
+    "tabs": { "individual": "Individual", "team": "Team" },
+    "filter": { "1d": "1 Day", "3d": "3 Days", "5d": "5 Days", "7d": "7 Days", "30d": "30 Days", "all": "All Time" },
+    "sort": { "tokens": "Tokens", "cost": "Cost", "recent": "Recent" },
+    "columns": {
+      "rank": "Rank", "name": "Name", "level": "Level",
+      "tokens": "Total Tokens", "cost": "Cost", "submitted": "Submitted"
+    }
+  },
+  "profile": {
+    "level": "Level",
+    "totalTokens": "Total Tokens",
+    "totalCost": "Total Cost",
+    "badges": "Badges",
+    "tokenChart": "Daily Token Usage",
+    "modelChart": "Model Breakdown",
+    "nextLevel": "Until Next Level"
+  },
+  "admin": {
+    "title": "Admin Dashboard",
+    "users": "All Users",
+    "syncDirectory": "Sync Directory",
+    "downloadReport": "Download CSV",
+    "linkAccounts": "Manual Account Link"
+  },
+  "auth": {
+    "loginTitle": "KLIC Leaderboard",
+    "loginSubtitle": "KLIC Claude Code Usage Leaderboard",
+    "googleLogin": "Sign in with Google",
+    "githubLogin": "Sign in with GitHub",
+    "domainError": "Only company email (@klic.co.kr) is allowed.",
+    "linkError": "Please sign in with Google first using the same email to link GitHub."
+  },
+  "team": {
+    "title": "Team Profile",
+    "members": "Members",
+    "memberCount": "{count} members",
+    "noTeam": "Team not found.",
+    "noMembers": "No members in this team.",
+    "stats": {
+      "totalTokens": "Total Tokens",
+      "totalCost": "Total Cost",
+      "sessions": "Sessions",
+      "turns": "Total Turns",
+      "activeDays": "Active Days",
+      "activeTime": "Active Time",
+      "commits": "Commits",
+      "pullRequests": "PRs",
+      "linesAdded": "Lines Added"
+    },
+    "memberColumns": {
+      "rank": "Rank",
+      "name": "Name",
+      "level": "Level",
+      "tokens": "Tokens",
+      "cost": "Cost"
+    }
+  },
+  "levels": {
+    "1": { "name": "🐣 Baby Token", "message": "Just logged in. First steps taken." },
+    "2": { "name": "🐜 Worker Ant", "message": "Working hard, but still in cute territory." },
+    "3": { "name": "🧐 Prompt Curious", "message": "Starting to put 'soul' into prompts." },
+    "4": { "name": "🔥 Full Send", "message": "Devouring data with wild eyes. Kinda scary." },
+    "5": { "name": "🤫 Are You a Bot?", "message": "Hard to tell if human or AI at this point." },
+    "6": { "name": "🦾 Human GPT", "message": "Brain cells replaced by 0s and 1s. One with AI." },
+    "7": { "name": "👑 Token King", "message": "Pure GOAT. Existence is data itself." },
+    "8": { "name": "🌌 Dopamine Marshal", "message": "Burning tokens at legendary speed." },
+    "9": { "name": "⚡ Earth Destroyer", "message": "The server room AC loves you most." },
+    "10": { "name": "💀 AI Zealot", "message": "Even the admins don't know what you're doing. God tier." }
+  }
+}

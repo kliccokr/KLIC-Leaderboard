@@ -1,0 +1,82 @@
+{
+  "nav": {
+    "leaderboard": "리더보드",
+    "profile": "프로필",
+    "admin": "관리자",
+    "logout": "로그아웃",
+    "login": "로그인",
+    "dashboard": "내 대시보드"
+  },
+  "leaderboard": {
+    "title": "KLIC 리더보드",
+    "subtitle": "Claude Code 사용량 순위",
+    "tabs": { "individual": "개인", "team": "팀" },
+    "filter": { "1d": "1일", "3d": "3일", "5d": "5일", "7d": "7일", "30d": "30일", "all": "전체" },
+    "sort": { "tokens": "토큰", "cost": "비용", "recent": "최근" },
+    "columns": {
+      "rank": "순위", "name": "이름", "level": "레벨",
+      "tokens": "총 토큰", "cost": "비용", "submitted": "제출일"
+    }
+  },
+  "profile": {
+    "level": "레벨",
+    "totalTokens": "총 토큰",
+    "totalCost": "총 비용",
+    "badges": "획득 배지",
+    "tokenChart": "일별 토큰 사용량",
+    "modelChart": "모델별 비중",
+    "nextLevel": "다음 레벨까지"
+  },
+  "admin": {
+    "title": "관리자 대시보드",
+    "users": "전체 직원",
+    "syncDirectory": "Directory 동기화",
+    "downloadReport": "CSV 다운로드",
+    "linkAccounts": "계정 수동 연동"
+  },
+  "auth": {
+    "loginTitle": "KLIC 리더보드",
+    "loginSubtitle": "케이엘정보통신 Claude Code 사용량 리더보드",
+    "googleLogin": "Google로 로그인",
+    "githubLogin": "GitHub으로 로그인",
+    "domainError": "회사 이메일(@klic.co.kr)로만 로그인할 수 있습니다.",
+    "linkError": "GitHub 계정을 연동하려면 동일한 이메일로 Google 로그인을 먼저 해주세요."
+  },
+  "team": {
+    "title": "팀 프로필",
+    "members": "팀원",
+    "memberCount": "{count}명",
+    "noTeam": "팀을 찾을 수 없습니다.",
+    "noMembers": "팀원이 없습니다.",
+    "stats": {
+      "totalTokens": "총 토큰",
+      "totalCost": "총 비용",
+      "sessions": "세션 수",
+      "turns": "총 턴",
+      "activeDays": "활성 일수",
+      "activeTime": "활성 시간",
+      "commits": "커밋",
+      "pullRequests": "PR",
+      "linesAdded": "추가 라인"
+    },
+    "memberColumns": {
+      "rank": "순위",
+      "name": "이름",
+      "level": "레벨",
+      "tokens": "토큰",
+      "cost": "비용"
+    }
+  },
+  "levels": {
+    "1": { "name": "🐣 응애 나 애기토큰", "message": "로그인만 해도 기특함. 이제 막 걸음마 뗌." },
+    "2": { "name": "🐜 출근하는 개미", "message": "열심히는 하는데 아직은 귀여운 수준." },
+    "3": { "name": "🧐 AI 좀 치나?", "message": "슬슬 프롬프트에 '영혼'을 담기 시작함." },
+    "4": { "name": "🔥 본격 맑눈광", "message": "광기 어린 눈으로 데이터 파먹는 중. (무서움)" },
+    "5": { "name": "🤫 님 혹시 AI임?", "message": "질문 수준이 사람인지 봇인지 헷갈리기 시작함." },
+    "6": { "name": "🦾 인간 GPT", "message": "뇌세포가 0과 1로 치환됨. 이미 일심동체." },
+    "7": { "name": "👑 토큰의 왕, 폼 미쳤다", "message": "그저 'GOAT'. 존재 자체가 데이터 그 자체." },
+    "8": { "name": "🌌 도파민 대원수", "message": "토큰 태우는 속도가 거의 화벽 등극 수준." },
+    "9": { "name": "⚡ 지구 파괴 커스텀", "message": "서버실 에어컨 사장님이 제일 좋아하는 VIP." },
+    "10": { "name": "💀 AI 노예", "message": "운영진도 얘 뭐하는지 모름. 신의 영역." }
+  }
+}

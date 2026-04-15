@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f0f23"/>
+      <stop offset="40%" stop-color="#1a1a3e"/>
+      <stop offset="70%" stop-color="#2d1b69"/>
+      <stop offset="100%" stop-color="#1a1a3e"/>
+    </linearGradient>
+    <linearGradient id="title-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <linearGradient id="bar1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="bar2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="bar3" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="bar4" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="bar5" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Top rainbow bar -->
+  <rect x="0" y="0" width="240" height="6" fill="#3b82f6"/>
+  <rect x="240" y="0" width="240" height="6" fill="#8b5cf6"/>
+  <rect x="480" y="0" width="240" height="6" fill="#ec4899"/>
+  <rect x="720" y="0" width="240" height="6" fill="#f59e0b"/>
+  <rect x="960" y="0" width="240" height="6" fill="#10b981"/>
+
+  <!-- Title -->
+  <text x="80" y="120" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="800" fill="#ffffff" letter-spacing="-1">KLIC</text>
+  <text x="80" y="165" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="600" fill="url(#title-grad)">Claude Code Leaderboard</text>
+  <text x="80" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#94a3b8">AI 코딩 퍼즐 활용량 순위 — 팀 &amp; 개인 리더보드</text>
+
+  <!-- Bar chart rows -->
+  <!-- Row 1 -->
+  <rect x="148" y="240" width="28" height="28" rx="6" fill="#3b82f6"/>
+  <text x="162" y="260" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+  <circle cx="196" cy="254" r="14" fill="#3b82f622" stroke="#3b82f666" stroke-width="2"/>
+  <rect x="228" y="240" width="780" height="28" rx="6" fill="#3b82f611" stroke="#3b82f633" stroke-width="0"/>
+  <rect x="228" y="240" width="780" height="28" rx="6" fill="url(#bar1)"/>
+  <rect x="228" y="240" width="3" height="28" rx="1" fill="#3b82f6"/>
+  <text x="1080" y="260" font-family="monospace" font-size="15" font-weight="700" fill="#e2e8f0" text-anchor="end">12.5M</text>
+
+  <!-- Row 2 -->
+  <rect x="148" y="284" width="28" height="28" rx="6" fill="#8b5cf6"/>
+  <text x="162" y="304" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+  <circle cx="196" cy="298" r="14" fill="#8b5cf622" stroke="#8b5cf666" stroke-width="2"/>
+  <rect x="228" y="284" width="608" height="28" rx="6" fill="url(#bar2)"/>
+  <rect x="228" y="284" width="3" height="28" rx="1" fill="#8b5cf6"/>
+  <text x="1080" y="304" font-family="monospace" font-size="15" font-weight="700" fill="#e2e8f0" text-anchor="end">9.8M</text>
+
+  <!-- Row 3 -->
+  <rect x="148" y="328" width="28" height="28" rx="6" fill="#ec4899"/>
+  <text x="162" y="348" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+  <circle cx="196" cy="342" r="14" fill="#ec489922" stroke="#ec489966" stroke-width="2"/>
+  <rect x="228" y="328" width="484" height="28" rx="6" fill="url(#bar3)"/>
+  <rect x="228" y="328" width="3" height="28" rx="1" fill="#ec4899"/>
+  <text x="1080" y="348" font-family="monospace" font-size="15" font-weight="700" fill="#e2e8f0" text-anchor="end">7.8M</text>
+
+  <!-- Row 4 -->
+  <rect x="148" y="372" width="28" height="28" rx="6" fill="#f59e0b"/>
+  <text x="162" y="392" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+  <circle cx="196" cy="386" r="14" fill="#f59e0b22" stroke="#f59e0b66" stroke-width="2"/>
+  <rect x="228" y="372" width="351" height="28" rx="6" fill="url(#bar4)"/>
+  <rect x="228" y="372" width="3" height="28" rx="1" fill="#f59e0b"/>
+  <text x="1080" y="392" font-family="monospace" font-size="15" font-weight="700" fill="#e2e8f0" text-anchor="end">5.6M</text>
+
+  <!-- Row 5 -->
+  <rect x="148" y="416" width="28" height="28" rx="6" fill="#10b981"/>
+  <text x="162" y="436" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+  <circle cx="196" cy="430" r="14" fill="#10b98122" stroke="#10b98166" stroke-width="2"/>
+  <rect x="228" y="416" width="242" height="28" rx="6" fill="url(#bar5)"/>
+  <rect x="228" y="416" width="3" height="28" rx="1" fill="#10b981"/>
+  <text x="1080" y="436" font-family="monospace" font-size="15" font-weight="700" fill="#e2e8f0" text-anchor="end">3.9M</text>
+
+  <!-- Bottom -->
+  <text x="80" y="590" font-family="system-ui, sans-serif" font-size="15" fill="#64748b">use.klic.co.kr</text>
+
+  <!-- Dots -->
+  <circle cx="1070" cy="586" r="5" fill="#3b82f6"/>
+  <circle cx="1090" cy="586" r="5" fill="#8b5cf6"/>
+  <circle cx="1110" cy="586" r="5" fill="#ec4899"/>
+  <circle cx="1130" cy="586" r="5" fill="#f59e0b"/>
+  <circle cx="1150" cy="586" r="5" fill="#10b981"/>
+</svg>

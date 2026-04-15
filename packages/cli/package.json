@@ -1,0 +1,24 @@
+{
+  "name": "klic-leaderboard",
+  "version": "0.1.0",
+  "description": "CLI to collect Claude Code token usage and submit to KLIC Leaderboard",
+  "bin": { "klic-leaderboard": "./dist/index.js" },
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --external:readline --outfile=dist/index.js --banner:js='#!/usr/bin/env node'",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@klic/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
