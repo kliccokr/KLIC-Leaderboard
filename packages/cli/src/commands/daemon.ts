@@ -4,7 +4,7 @@ import { join } from "path";
 import os from "os";
 import { submitCommand } from "./submit";
 
-const INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const DATA_DIR = join(os.homedir(), ".klic", "leaderboard");
 const PID_FILE = join(DATA_DIR, "daemon.pid");
 const LOG_FILE = join(DATA_DIR, "daemon.log");
@@ -73,7 +73,7 @@ export function stopCommand(): void {
 function runDaemonLoop(): void {
   const ts = () => new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 
-  console.log(`[${ts()}] Daemon started. Submitting every 30 minutes.`);
+  console.log(`[${ts()}] Daemon started. Submitting every 1 hour.`);
 
   // Run first submit immediately
   runSubmit();

@@ -112,8 +112,8 @@ mkdir -p "$LOG_DIR"
 
 if [ "$IS_WSL" = true ]; then
   # WSL: use cron (systemd may not be available)
-  (crontab -l 2>/dev/null | grep -v "$BIN_NAME"; echo "*/30 * * * * $INSTALL_DIR/$BIN_NAME >> $LOG_DIR/daemon.log 2>&1") | crontab -
-  log "   -> WSL cron 등록 완료 (30분마다 실행)"
+  (crontab -l 2>/dev/null | grep -v "$BIN_NAME"; echo "0 * * * * $INSTALL_DIR/$BIN_NAME >> $LOG_DIR/daemon.log 2>&1") | crontab -
+  log "   -> WSL cron 등록 완료 (1시간마다 실행)"
 elif [ "$OS" = "Darwin" ]; then
   PLIST="$HOME/Library/LaunchAgents/co.klic.leaderboard.plist"
   NODE_DIR="$(dirname "$NODE_PATH")"
@@ -202,7 +202,7 @@ if [ "$LOGIN_OK" = true ]; then
   elif [ "$OS" = "Linux" ]; then
     systemctl --user start "$SERVICE_NAME" 2>/dev/null
   fi
-  log "   30분마다 Claude Code 사용량이 자동 제출됩니다."
+  log "   1시간마다 Claude Code 사용량이 자동 제출됩니다."
 else
   log ""
   log "${YELLOW}[5/5]${NC} 로그인을 건너뛰셨습니다."
