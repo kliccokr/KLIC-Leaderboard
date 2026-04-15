@@ -67,7 +67,9 @@ export default async function MyDashboardPage({
   const rangeStart = range ? range.start.toISOString().slice(0, 10) : null;
   const rangeEnd = range ? range.end.toISOString().slice(0, 10) : null;
 
-  // Aggregate daily breakdown (filtered by period)
+  // Aggregate daily breakdown with dedup (matches leaderboard calculation)
+  // For each (user, date), take MAX across submissions to avoid inflated totals
+  // from overlapping date ranges submitted by multiple PCs.
   const dailyMap = new Map<string, DailyBreakdown>();
   for (const sub of userSubmissions) {
     for (const d of sub.dailyBreakdown as DailyBreakdown[]) {
@@ -75,12 +77,12 @@ export default async function MyDashboardPage({
       if (rangeEnd && d.date > rangeEnd) continue;
       const existing = dailyMap.get(d.date);
       if (existing) {
-        existing.inputTokens += d.inputTokens;
-        existing.outputTokens += d.outputTokens;
-        existing.cacheCreationTokens += d.cacheCreationTokens;
-        existing.cacheReadTokens += d.cacheReadTokens;
-        existing.totalTokens += d.totalTokens;
-        existing.totalCost += d.totalCost;
+        existing.inputTokens = Math.max(existing.inputTokens, d.inputTokens);
+        existing.outputTokens = Math.max(existing.outputTokens, d.outputTokens);
+        existing.cacheCreationTokens = Math.max(existing.cacheCreationTokens, d.cacheCreationTokens);
+        existing.cacheReadTokens = Math.max(existing.cacheReadTokens, d.cacheReadTokens);
+        existing.totalTokens = Math.max(existing.totalTokens, d.totalTokens);
+        existing.totalCost = Math.max(existing.totalCost, d.totalCost);
       } else {
         dailyMap.set(d.date, { ...d });
       }

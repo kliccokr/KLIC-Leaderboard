@@ -10,6 +10,7 @@ const sections = [
   { id: "level-system", title: "레벨 시스템" },
   { id: "tracking-tech", title: "추적 방식" },
   { id: "tos", title: "TOS 위반 주의" },
+  { id: "rate-limit-setup", title: "Rate Limit 추적" },
   { id: "faq", title: "FAQ" },
 ];
 
@@ -470,6 +471,146 @@ export default function DocsPage() {
             </div>
           </section>
 
+          {/* Rate Limit Setup */}
+          <section id="rate-limit-setup" className="scroll-mt-20 space-y-4">
+            <h2 className="text-2xl font-bold text-foreground">Rate Limit 추적 설정</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              리더보드의 <strong className="text-foreground">초기화</strong> 및 <strong className="text-foreground">사용량</strong> 열에
+              Rate Limit 데이터를 표시하려면, Claude Code의 statusline 기능을 활용하여 Rate Limit 데이터를 수집해야 합니다.
+              설정하지 않으면 N/A로 표시됩니다.
+            </p>
+
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
+              <p className="text-sm text-amber-600 font-medium">필수 조건</p>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>Claude Code Pro/Max/Team/Enterprise 구독 (OAuth 인증)</li>
+                <li>Claude 모델(Anthropic) 사용 — glm 등 다른 모델에서는 Rate Limit 데이터가 제공되지 않습니다</li>
+              </ul>
+            </div>
+
+            <h3 className="text-lg font-semibold text-foreground">설치 방법</h3>
+            <p className="text-sm text-muted-foreground">
+              아래 3단계를 따라 설정하세요. 설정 후 Claude Code를 사용할 때마다 Rate Limit 데이터가 자동으로 수집됩니다.
+            </p>
+
+            <div className="space-y-4">
+              {/* Step 1 */}
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="px-4 py-2 bg-muted/50 border-b border-border flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">1</span>
+                  <span className="font-semibold text-foreground text-sm">statusline 스크립트 다운로드</span>
+                </div>
+                <div className="p-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    스크립트를 <code className="bg-muted px-1.5 py-0.5 rounded text-foreground text-xs">~/.claude/</code> 디렉토리에 다운로드합니다.
+                  </p>
+                  <div className="bg-muted rounded-lg p-3 font-mono text-sm text-foreground overflow-x-auto">
+                    <div className="flex items-center justify-between">
+                      <span>curl -fsSL https://use.klic.co.kr/cli/klic-statusline.sh -o ~/.claude/klic-statusline.sh</span>
+                      <CopyButton text="curl -fsSL https://use.klic.co.kr/cli/klic-statusline.sh -o ~/.claude/klic-statusline.sh" />
+                    </div>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3 font-mono text-sm text-foreground overflow-x-auto">
+                    <div className="flex items-center justify-between">
+                      <span>chmod +x ~/.claude/klic-statusline.sh</span>
+                      <CopyButton text="chmod +x ~/.claude/klic-statusline.sh" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="px-4 py-2 bg-muted/50 border-b border-border flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">2</span>
+                  <span className="font-semibold text-foreground text-sm">settings.json에 statusLine 설정 추가</span>
+                </div>
+                <div className="p-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    <code className="bg-muted px-1.5 py-0.5 rounded text-foreground text-xs">~/.claude/settings.json</code> 파일에
+                    아래 설정을 추가합니다. 파일이 없으면 새로 만드세요.
+                  </p>
+                  <div className="bg-muted rounded-lg p-3 font-mono text-sm text-foreground overflow-x-auto">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground">~/.claude/settings.json</span>
+                      <CopyButton text={'{\n  "statusLine": {\n    "type": "command",\n    "command": "~/.claude/klic-statusline.sh"\n  }\n}'} />
+                    </div>
+                    <pre className="text-foreground">{`{
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/klic-statusline.sh"
+  }
+}`}</pre>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    이미 다른 설정이 있는 경우 <code className="bg-muted px-1 py-0.5 rounded text-foreground">statusLine</code> 항목만 추가하세요.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="px-4 py-2 bg-muted/50 border-b border-border flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">3</span>
+                  <span className="font-semibold text-foreground text-sm">확인</span>
+                </div>
+                <div className="p-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Claude Code를 실행하여 메시지를 보낸 후, 아래 파일이 생성되었는지 확인합니다.
+                  </p>
+                  <div className="bg-muted rounded-lg p-3 font-mono text-sm text-foreground overflow-x-auto">
+                    <div className="flex items-center justify-between">
+                      <span>cat ~/.claude/rate-limits.json</span>
+                      <CopyButton text="cat ~/.claude/rate-limits.json" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    파일이 생성되면 다음 CLI 실행 시 자동으로 Rate Limit 데이터가 서버에 전송됩니다.
+                    리더보드의 초기화/사용량 열에 데이터가 표시됩니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Existing statusline users */}
+            <div className="rounded-lg border border-border p-4 space-y-2">
+              <h3 className="font-semibold text-foreground text-sm">이미 statusline 스크립트를 사용 중인 경우</h3>
+              <p className="text-sm text-muted-foreground">
+                기존 스크립트에 아래 한 줄을 추가하면 됩니다. stdin JSON에서
+                <code className="bg-muted px-1 py-0.5 rounded text-foreground text-xs">rate_limits</code>를 추출하여
+                <code className="bg-muted px-1 py-0.5 rounded text-foreground text-xs">~/.claude/rate-limits.json</code>에 저장합니다.
+              </p>
+              <div className="bg-muted rounded-lg p-3 font-mono text-xs text-foreground overflow-x-auto whitespace-pre-wrap">
+{`# 기존 스크립트의 input=$(cat) 아래에 추가:
+echo "$input" | jq -c '{rate_limits: (.rate_limits // {}), timestamp: (now | todate)}' \\
+  > "$HOME/.claude/rate-limits.json" 2>/dev/null || true`}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                <code className="bg-muted px-1 py-0.5 rounded text-foreground text-xs">jq</code>가 설치되어 있어야 합니다.
+                없으면 <code className="bg-muted px-1 py-0.5 rounded text-foreground text-xs">brew install jq</code> 또는{" "}
+                <code className="bg-muted px-1 py-0.5 rounded text-foreground text-xs">apt install jq</code>로 설치하세요.
+              </p>
+            </div>
+
+            {/* Troubleshooting */}
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4 space-y-2">
+              <h3 className="font-semibold text-foreground text-sm">스크립트가 정상 동작하지 않는 경우</h3>
+              <p className="text-sm text-muted-foreground">
+                사용자의 환경(OS, 셸, jq/Node.js 버전 등)에 따라 스크립트가 오류를 일으킬 수 있습니다.
+                이 경우 Claude Code에 아래와 같이 요청하면 자동으로 설정해 줍니다.
+              </p>
+              <div className="bg-muted rounded-lg p-3 font-mono text-xs text-foreground overflow-x-auto">
+                <div className="flex items-center justify-between">
+                  <span>"statusline 스크립트를 설정해줘. https://use.klic.co.kr/cli/klic-statusline.sh 를 참고해."</span>
+                  <CopyButton text='statusline 스크립트를 설정해줘. https://use.klic.co.kr/cli/klic-statusline.sh 를 참고해.' />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Claude Code가 현재 환경에 맞게 스크립트를 다운로드하고 settings.json을 수정합니다.
+              </p>
+            </div>
+          </section>
+
           {/* FAQ */}
           <section id="faq" className="scroll-mt-20 space-y-4">
             <h2 className="text-2xl font-bold text-foreground">FAQ</h2>
@@ -503,9 +644,10 @@ export default function DocsPage() {
               <div className="rounded-lg border border-border p-4 space-y-2">
                 <h3 className="font-semibold text-foreground text-sm">Rate Limit이 N/A로 표시되요</h3>
                 <p className="text-sm text-muted-foreground">
-                  Rate Limit 데이터는 Claude 모델(Anthropic)을 사용할 때만 수집됩니다.
-                  다른 모델(glm 등)을 사용 중이면 N/A로 표시됩니다.
-                  Claude 모델로 전환 후 CLI를 실행하면 데이터가 갱신됩니다.
+                  Rate Limit 추적을 위한 statusline 스크립트가 설정되지 않았습니다.
+                  <a href="#rate-limit-setup" className="text-primary hover:underline ml-1">Rate Limit 추적 설정</a> 가이드를
+                  따라 설정하면 초기화/사용량 데이터가 표시됩니다.
+                  glm 등 다른 모델을 사용 중이면 Rate Limit 데이터가 제공되지 않아 N/A로 표시됩니다.
                 </p>
               </div>
 

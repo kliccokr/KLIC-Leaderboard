@@ -6,7 +6,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="40x40" />
+        <link rel="icon" href="/favicon.png" type="image/png" sizes="40x40" />
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>
