@@ -152,7 +152,11 @@ export default function DocsPage() {
               </div>
               <div className="rounded-lg border border-border p-3 space-y-1">
                 <code className="text-sm font-medium text-foreground">klic-leaderboard daemon</code>
-                <p className="text-xs text-muted-foreground">30분마다 자동 제출 (포그라운드)</p>
+                <p className="text-xs text-muted-foreground">1시간마다 자동 제출 (포그라운드)</p>
+              </div>
+              <div className="rounded-lg border border-border p-3 space-y-1">
+                <code className="text-sm font-medium text-foreground">klic-leaderboard stop</code>
+                <p className="text-xs text-muted-foreground">데몬 중지</p>
               </div>
               <div className="rounded-lg border border-border p-3 space-y-1">
                 <code className="text-sm font-medium text-foreground">klic-leaderboard status</code>
@@ -162,6 +166,10 @@ export default function DocsPage() {
 
             {/* Service management */}
             <h3 className="text-lg font-semibold text-foreground">서비스 관리</h3>
+            <p className="text-sm text-muted-foreground">
+              <code className="bg-muted px-1.5 py-0.5 rounded text-foreground text-xs">klic-leaderboard stop</code> 명령어로 모든 플랫폼에서 중지할 수 있습니다.
+              플랫폼별로 직접 제어하려면 아래 명령어를 사용하세요.
+            </p>
             <div className="grid grid-cols-1 gap-3">
               <div className="rounded-lg border border-border overflow-hidden">
                 <div className="px-4 py-2 bg-muted/50 border-b border-border">
@@ -169,7 +177,8 @@ export default function DocsPage() {
                 </div>
                 <div className="p-4 space-y-1">
                   <div className="bg-muted rounded-md p-3 font-mono text-xs text-foreground overflow-x-auto">
-                    $ launchctl bootout gui/$(id -u)/co.klic.leaderboard   # 중지<br />
+                    $ klic-leaderboard stop                              # 중지<br />
+                    $ launchctl bootout gui/$(id -u)/co.klic.leaderboard   # 직접 중지<br />
                     $ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/co.klic.leaderboard.plist  # 시작
                   </div>
                 </div>
@@ -180,20 +189,33 @@ export default function DocsPage() {
                 </div>
                 <div className="p-4 space-y-1">
                   <div className="bg-muted rounded-md p-3 font-mono text-xs text-foreground overflow-x-auto">
-                    $ systemctl --user stop klic-leaderboard    # 중지<br />
-                    $ systemctl --user start klic-leaderboard   # 시작<br />
-                    $ systemctl --user status klic-leaderboard  # 상태
+                    $ klic-leaderboard stop                           # 중지<br />
+                    $ systemctl --user stop klic-leaderboard          # 직접 중지<br />
+                    $ systemctl --user start klic-leaderboard         # 시작<br />
+                    $ systemctl --user status klic-leaderboard        # 상태
                   </div>
                 </div>
               </div>
               <div className="rounded-lg border border-border overflow-hidden">
                 <div className="px-4 py-2 bg-muted/50 border-b border-border">
-                  <h4 className="font-semibold text-foreground text-sm">Windows</h4>
+                  <h4 className="font-semibold text-foreground text-sm">Windows (PowerShell)</h4>
                 </div>
                 <div className="p-4 space-y-1">
                   <div className="bg-muted rounded-md p-3 font-mono text-xs text-foreground overflow-x-auto">
-                    PS&gt; Unregister-ScheduledTask -TaskName KLICLeaderboard  # 중지<br />
-                    PS&gt; Get-Content ~/.klic/leaderboard/daemon.log -Tail 20  # 로그
+                    PS&gt; klic-leaderboard stop                            # 중지<br />
+                    PS&gt; Unregister-ScheduledTask -TaskName KLICLeaderboard  # 직접 중지<br />
+                    PS&gt; Start-ScheduledTask -TaskName KLICLeaderboard       # 시작
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="px-4 py-2 bg-muted/50 border-b border-border">
+                  <h4 className="font-semibold text-foreground text-sm">WSL</h4>
+                </div>
+                <div className="p-4 space-y-1">
+                  <div className="bg-muted rounded-md p-3 font-mono text-xs text-foreground overflow-x-auto">
+                    $ klic-leaderboard stop                           # 중지<br />
+                    $ crontab -e                                      # cron 항목 삭제로 중지
                   </div>
                 </div>
               </div>

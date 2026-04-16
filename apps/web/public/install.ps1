@@ -85,11 +85,11 @@ Unregister-ScheduledTask -TaskName $ServiceName -Confirm:$false -ErrorAction Sil
 
 $NodePath = (Get-Command node).Source
 $Action = New-ScheduledTaskAction -Execute "$InstallDir\$BinName.cmd" -Argument "daemon" -WorkingDirectory $LogDir
-$Trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 30)
+$Trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 60)
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartInterval (New-TimeSpan -Minutes 1) -RestartCount 3
 
-Register-ScheduledTask -TaskName $ServiceName -Action $Action -Trigger $Trigger -Settings $Settings -Description "KLIC Leaderboard - 30분마다 Claude Code 사용량 제출" | Out-Null
-Write-Host "   -> 작업 스케줄러 등록 완료 (로그인 시 + 30분마다 실행)" -ForegroundColor Gray
+Register-ScheduledTask -TaskName $ServiceName -Action $Action -Trigger $Trigger -Settings $Settings -Description "KLIC Leaderboard - 1시간마다 Claude Code 사용량 제출" | Out-Null
+Write-Host "   -> 작업 스케줄러 등록 완료 (로그인 시 + 1시간마다 실행)" -ForegroundColor Gray
 
 # 4. Login
 Write-Host ""
@@ -109,7 +109,7 @@ try {
     Start-ScheduledTask -TaskName $ServiceName
     Write-Host ""
     Write-Host "[5/5] 데몬 시작 완료!" -ForegroundColor Green
-    Write-Host "   30분마다 Claude Code 사용량이 자동 제출됩니다." -ForegroundColor Gray
+    Write-Host "   1시간마다 Claude Code 사용량이 자동 제출됩니다." -ForegroundColor Gray
 } catch {
     Write-Host ""
     Write-Host "[5/5] 로그인을 건너뛰셨습니다." -ForegroundColor Yellow

@@ -111,7 +111,7 @@ export default async function LeaderboardPage({
       ? sql`WHERE (u.name ILIKE '%' || ${searchTerm} || '%' OR u.email ILIKE '%' || ${searchTerm} || '%' OR u.team ILIKE '%' || ${searchTerm} || '%')`
       : sql``}
     ORDER BY CAST(coalesce(a.total_tokens, '0') AS bigint) DESC
-    LIMIT ${searchTerm ? 200 : 100}
+    LIMIT ${searchTerm ? 200 : 200}
   `);
 
   const entries: LeaderboardEntry[] = rows.map((r, i) => ({

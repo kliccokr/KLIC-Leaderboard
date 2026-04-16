@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { LeaderboardEntry } from "@klic/shared";
@@ -97,31 +97,47 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
 
 export function LeaderboardTable({ entries, locale, totalCount }: Props) {
   const [now, setNow] = useState(Date.now());
+  const [expanded, setExpanded] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const DEFAULT_COUNT = 20;
+  const hasSearch = query.trim().length > 0;
+  const visibleEntries = hasSearch || expanded ? entries : entries.slice(0, DEFAULT_COUNT);
+  const hasMore = !hasSearch && entries.length > DEFAULT_COUNT;
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(timer);
   }, []);
 
+  // Sync from URL only on mount or browser back/forward
+  const initializedRef = useRef(false);
   useEffect(() => {
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      return;
+    }
     setQuery(searchParams.get("q") ?? "");
   }, [searchParams]);
 
   function handleSearch(value: string) {
     setQuery(value);
-    startTransition(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value.trim()) {
-        params.set("q", value.trim());
-      } else {
-        params.delete("q");
-      }
-      router.push(`?${params.toString()}`);
-    });
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      startTransition(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (value.trim()) {
+          params.set("q", value.trim());
+        } else {
+          params.delete("q");
+        }
+        router.push(`?${params.toString()}`);
+      });
+    }, 300);
   }
 
   return (
@@ -143,7 +159,7 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
 
       {/* Mobile: card layout */}
       <div className={`md:hidden space-y-3 ${isPending ? "opacity-60" : ""}`}>
-        {entries.map((entry) => (
+        {visibleEntries.map((entry) => (
           <MobileCard key={entry.userId} entry={entry} locale={locale} now={now} />
         ))}
       </div>
@@ -163,7 +179,7 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {entries.map((entry) => {
+            {visibleEntries.map((entry) => {
               const calculatedLevel = calculateLevel(entry.totalTokens);
               const levelName = locale === "ko" ? calculatedLevel.info.nameKo : calculatedLevel.info.nameEn;
               return (
@@ -204,6 +220,21 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
           </tbody>
         </table>
       </div>
+
+      {/* Expand / Collapse */}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="px-5 py-2 rounded-lg border border-border bg-muted/50 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            {expanded
+              ? "접기"
+              : `전체 보기 (${entries.length}명)`}
+          </button>
+        </div>
+      )}
     </>
   );
 }
