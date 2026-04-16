@@ -63,9 +63,9 @@ Schema files in `packages/db/src/schema/`. Key tables:
 - `userSessions` — per-session granularity, upserted on `(userId, sessionId)`, includes `toolCounts` and `taskCategories` JSONB
 - `apiKeys` — SHA-256 hashed keys for CLI auth
 
-### Leaderboard Deduplication
+### Leaderboard Aggregation
 
-Users with multiple PCs submit overlapping `dailyBreakdown` data. The leaderboard query (`page.tsx`) uses raw SQL with daily-level dedup: for each (user, date), takes MAX tokens across all submissions, then SUMs per user. This prevents inflated totals from overlapping date ranges.
+Users with multiple PCs each submit their own `dailyBreakdown` data. Each PC scans only its local `~/.claude/projects/`, so different PCs have genuinely different sessions. The leaderboard query sums all daily tokens across all submissions per user — no dedup needed.
 
 ### Org Unit Sync
 

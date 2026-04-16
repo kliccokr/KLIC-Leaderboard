@@ -79,7 +79,7 @@ export default async function TeamProfilePage({
   const rangeStartStr = rangeStart ? rangeStart.toISOString().slice(0, 10) : null;
   const rangeEndStr = rangeEnd ? rangeEnd.toISOString().slice(0, 10) : null;
 
-  // Aggregate daily breakdown (filtered by period)
+  // Aggregate daily breakdown (SUM — each PC has its own sessions, no overlap)
   const dailyMap = new Map<string, DailyBreakdown>();
   for (const s of allSubmissions) {
     for (const d of s.dailyBreakdown as DailyBreakdown[]) {
@@ -118,7 +118,7 @@ export default async function TeamProfilePage({
   }
   const modelData = [...modelMap.entries()].map(([name, value]) => ({ name, value }));
 
-  // Per-member stats (from filtered daily data)
+  // Per-member stats (SUM — each PC has its own sessions, no overlap)
   const memberDailyMap = new Map<string, Map<string, DailyBreakdown>>();
   for (const s of allSubmissions) {
     for (const d of s.dailyBreakdown as DailyBreakdown[]) {

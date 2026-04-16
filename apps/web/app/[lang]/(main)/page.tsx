@@ -62,24 +62,23 @@ export default async function LeaderboardPage({
     sevenDayUsedPct: number | null;
     rateLimitUpdatedAt: Date | null;
   }>(sql`
-    WITH deduped_daily AS (
+    WITH daily AS (
       SELECT
         s.user_id,
         (day->>'date')::date AS day_date,
-        MAX((day->>'totalTokens')::bigint) AS day_tokens,
-        MAX((day->>'totalCost')::numeric) AS day_cost
+        (day->>'totalTokens')::bigint AS day_tokens,
+        (day->>'totalCost')::numeric AS day_cost
       FROM submissions s,
            jsonb_array_elements(s.daily_breakdown) AS day
       WHERE ${submissionFilter}
         AND ${periodFilter}
-      GROUP BY s.user_id, (day->>'date')::date
     ),
     aggregated AS (
       SELECT
         user_id,
         SUM(day_tokens) AS total_tokens,
         SUM(day_cost) AS total_cost
-      FROM deduped_daily
+      FROM daily
       GROUP BY user_id
     ),
     ranked AS (

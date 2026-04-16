@@ -59,9 +59,9 @@ export async function GET(req: Request): Promise<Response> {
     ),
   ].join("\n");
 
-  return new Response(csv, {
+  return new Response("\uFEFF" + csv, {
     headers: {
-      "Content-Type": "text/csv",
+      "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="klic-cost-report-${month}.csv"`,
     },
   });

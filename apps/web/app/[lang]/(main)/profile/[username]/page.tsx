@@ -64,7 +64,7 @@ export default async function ProfilePage({
   const rangeStartStr = rangeStart ? rangeStart.toISOString().slice(0, 10) : null;
   const rangeEndStr = rangeEnd ? rangeEnd.toISOString().slice(0, 10) : null;
 
-  // Aggregate daily breakdown (filtered by period)
+  // Aggregate daily breakdown (SUM — each PC has its own sessions, no overlap)
   const dailyMap = new Map<string, DailyBreakdown>();
   for (const s of userSubmissions) {
     for (const d of s.dailyBreakdown as DailyBreakdown[]) {
