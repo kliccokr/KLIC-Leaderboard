@@ -7,6 +7,12 @@ export interface DailyBreakdown {
   totalTokens: number;
   totalCost: number;
   modelsUsed: string[];
+  // Activity metrics (per-day)
+  linesAdded?: number;
+  linesRemoved?: number;
+  commitsCount?: number;
+  pullRequestsCount?: number;
+  activeTimeSecs?: number;
 }
 
 export interface ActivityMetrics {

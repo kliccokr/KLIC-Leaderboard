@@ -6,6 +6,7 @@ import { calculateLevel, calculateTeamLevel } from "@klic/shared";
 import { LevelProgress } from "@/components/profile/LevelProgress";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 import type { DailyBreakdown } from "@klic/shared";
+import { backfillDailyActivity, getPeriodRange } from "@/lib/dashboard-helpers";
 
 function fmtTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -28,7 +29,7 @@ export default async function TeamProfilePage({
   searchParams: Promise<{ period?: string }>;
 }) {
   const { lang, teamName } = await params;
-  const { period = "30d" } = await searchParams;
+  const { period = "1d" } = await searchParams;
   const t = await getTranslations({ locale: lang, namespace: "team" });
   const decodedTeamName = decodeURIComponent(teamName);
 
@@ -38,15 +39,10 @@ export default async function TeamProfilePage({
 
   if (teamMembers.length === 0) notFound();
 
-  // Period range
-  let rangeStart: Date | null = null;
-  let rangeEnd: Date | null = null;
-  if (period !== "all") {
-    const days = period === "1d" ? 1 : period === "3d" ? 3 : period === "5d" ? 5 : period === "7d" ? 7 : period === "30d" ? 30 : 90;
-    rangeStart = new Date(Date.now() - days * 86_400_000);
-    rangeStart.setHours(0, 0, 0, 0);
-    rangeEnd = new Date();
-  }
+  // Period range (UTC-based to match dailyBreakdown dates)
+  const periodRange = getPeriodRange(period);
+  let rangeStart: Date | null = periodRange?.start ?? null;
+  let rangeEnd: Date | null = periodRange?.end ?? null;
 
   const memberIds = teamMembers.map((m) => m.id);
 
@@ -93,6 +89,11 @@ export default async function TeamProfilePage({
         existing.cacheReadTokens += d.cacheReadTokens;
         existing.totalTokens += d.totalTokens;
         existing.totalCost += d.totalCost;
+        existing.linesAdded = (existing.linesAdded ?? 0) + (d.linesAdded ?? 0);
+        existing.linesRemoved = (existing.linesRemoved ?? 0) + (d.linesRemoved ?? 0);
+        existing.commitsCount = (existing.commitsCount ?? 0) + (d.commitsCount ?? 0);
+        existing.pullRequestsCount = (existing.pullRequestsCount ?? 0) + (d.pullRequestsCount ?? 0);
+        existing.activeTimeSecs = (existing.activeTimeSecs ?? 0) + (d.activeTimeSecs ?? 0);
       } else {
         dailyMap.set(d.date, { ...d });
       }
@@ -100,14 +101,18 @@ export default async function TeamProfilePage({
   }
   const dailyData = [...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date));
 
+  // Backfill activity data for old submissions that lack per-day fields
+  backfillDailyActivity(dailyData, allSubmissions, rangeStartStr, rangeEndStr);
+
   // Totals from filtered daily data
   const totalTokens = dailyData.reduce((sum, d) => sum + d.totalTokens, 0);
   const totalCost = dailyData.reduce((sum, d) => sum + d.totalCost, 0);
 
-  const totalActiveTimeSecs = allSubmissions.reduce((s, r) => s + (r.activeTimeSecs ?? 0), 0);
-  const totalCommits = allSubmissions.reduce((s, r) => s + (r.commitsCount ?? 0), 0);
-  const totalPRs = allSubmissions.reduce((s, r) => s + (r.pullRequestsCount ?? 0), 0);
-  const totalLinesAdded = allSubmissions.reduce((s, r) => s + (r.linesAdded ?? 0), 0);
+  // Activity stats from filtered daily breakdown (not submission-level totals)
+  const totalActiveTimeSecs = dailyData.reduce((s, d) => s + (d.activeTimeSecs ?? 0), 0);
+  const totalCommits = dailyData.reduce((s, d) => s + (d.commitsCount ?? 0), 0);
+  const totalPRs = dailyData.reduce((s, d) => s + (d.pullRequestsCount ?? 0), 0);
+  const totalLinesAdded = dailyData.reduce((s, d) => s + (d.linesAdded ?? 0), 0);
 
   // Model breakdown (from filtered daily data)
   const modelMap = new Map<string, number>();
@@ -214,10 +219,14 @@ export default async function TeamProfilePage({
 
   const activeDays = dailyData.filter((d) => d.totalTokens > 0).length;
 
+  // Count registered PCs across team
+  const pcCount = new Set(allSubmissions.map((s) => s.source)).size;
+
   const stats = [
     { label: t("stats.totalTokens"), value: fmtTokens(totalTokens) },
-    { label: t("stats.totalCost"), value: `$${totalCost.toFixed(2)}` },
+    { label: t("stats.totalCost"), value: `$${totalCost.toFixed(2)}`, tooltip: "API 비용 추정치 (토큰 단가 기준)" },
     { label: t("stats.sessions"), value: totalSessionsCount.toLocaleString() },
+    { label: "등록 PC", value: `${pcCount}대` },
     { label: t("stats.turns"), value: totalTurns.toLocaleString() },
     { label: t("stats.activeDays"), value: `${activeDays}일` },
     { label: t("stats.activeTime"), value: totalActiveTimeSecs > 0 ? fmtTime(totalActiveTimeSecs) : "-" },

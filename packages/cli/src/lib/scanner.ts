@@ -6,6 +6,12 @@ import type { ActivityMetrics, DailyBreakdown, RateLimits, SessionData, Submissi
 import { classifyTurn } from "@klic/shared";
 import { estimateCost } from "./pricing";
 
+/** Format a Date as KST (UTC+9) date string YYYY-MM-DD */
+function kstDateStr(d: Date): string {
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
+}
+
 export interface ScanOptions {
   days?: number; // Number of days to include (0 = all time, default)
   onProgress?: (current: number, total: number) => void;
@@ -242,6 +248,11 @@ export function scanAllProjects(options: ScanOptions = {}): SubmissionPayload | 
       totalTokens: number;
       cost: number;
       models: Record<string, number>;
+      linesAdded: number;
+      linesRemoved: number;
+      commitsCount: number;
+      pullRequestsCount: number;
+      activeTimeSecs: number;
     }
   > = {};
   let firstTimestamp: string | null = null;
@@ -374,12 +385,16 @@ export function scanAllProjects(options: ScanOptions = {}): SubmissionPayload | 
             models[model] = (models[model] || 0) + messageTokens;
             sesModels[model] = (sesModels[model] || 0) + messageTokens;
 
-            // Daily aggregation
+            // Daily aggregation (KST date)
+            let eventDate: string | null = null;
             if (event.timestamp) {
-              const date = new Date(event.timestamp).toISOString().split("T")[0];
+              const d = new Date(event.timestamp);
+              // KST = UTC+9
+              const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+              eventDate = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
 
-              if (!dailyData[date]) {
-                dailyData[date] = {
+              if (!dailyData[eventDate]) {
+                dailyData[eventDate] = {
                   inputTokens: 0,
                   outputTokens: 0,
                   cacheCreationTokens: 0,
@@ -387,10 +402,15 @@ export function scanAllProjects(options: ScanOptions = {}): SubmissionPayload | 
                   totalTokens: 0,
                   cost: 0,
                   models: {},
+                  linesAdded: 0,
+                  linesRemoved: 0,
+                  commitsCount: 0,
+                  pullRequestsCount: 0,
+                  activeTimeSecs: 0,
                 };
               }
 
-              const day = dailyData[date];
+              const day = dailyData[eventDate];
               day.inputTokens += inputTokens;
               day.outputTokens += outputTokens;
               day.cacheCreationTokens += cacheCreation;
@@ -422,12 +442,20 @@ export function scanAllProjects(options: ScanOptions = {}): SubmissionPayload | 
 
                 if (block.name === "Bash") {
                   const cmd: string = block.input?.command ?? "";
-                  if (/\bgit\s+commit\b/.test(cmd)) totalCommits++;
-                  if (/\bgh\s+pr\s+create\b/.test(cmd)) totalPRs++;
+                  if (/\bgit\s+commit\b/.test(cmd)) {
+                    totalCommits++;
+                    if (eventDate) dailyData[eventDate].commitsCount++;
+                  }
+                  if (/\bgh\s+pr\s+create\b/.test(cmd)) {
+                    totalPRs++;
+                    if (eventDate) dailyData[eventDate].pullRequestsCount++;
+                  }
                   currentTurnBashCommands.push(cmd);
                 } else if (block.name === "Write") {
                   const fileContent: string = block.input?.content ?? "";
-                  totalLinesAdded += fileContent.split("\n").length;
+                  const lineCount = fileContent.split("\n").length;
+                  totalLinesAdded += lineCount;
+                  if (eventDate) dailyData[eventDate].linesAdded += lineCount;
                 } else if (block.name === "Edit" || block.name === "MultiEdit") {
                   const edits = block.name === "MultiEdit"
                     ? (block.input?.edits ?? [])
@@ -436,8 +464,14 @@ export function scanAllProjects(options: ScanOptions = {}): SubmissionPayload | 
                     if (!edit) continue;
                     const oldStr: string = edit.old_string ?? "";
                     const newStr: string = edit.new_string ?? "";
-                    totalLinesAdded += newStr ? newStr.split("\n").length : 0;
-                    totalLinesRemoved += oldStr ? oldStr.split("\n").length : 0;
+                    const added = newStr ? newStr.split("\n").length : 0;
+                    const removed = oldStr ? oldStr.split("\n").length : 0;
+                    totalLinesAdded += added;
+                    totalLinesRemoved += removed;
+                    if (eventDate) {
+                      dailyData[eventDate].linesAdded += added;
+                      dailyData[eventDate].linesRemoved += removed;
+                    }
                   }
                 }
 
@@ -469,7 +503,25 @@ export function scanAllProjects(options: ScanOptions = {}): SubmissionPayload | 
         const diffSecs = Math.round(
           (new Date(sesLastTs).getTime() - new Date(sesFirstTs).getTime()) / 1000
         );
-        if (diffSecs > 0) totalActiveTimeSecs += diffSecs;
+        if (diffSecs > 0) {
+          totalActiveTimeSecs += diffSecs;
+          // Distribute active time across days spanned by this session
+          const startDate = new Date(sesFirstTs).toISOString().split("T")[0];
+          const endDate = new Date(sesLastTs).toISOString().split("T")[0];
+          if (startDate === endDate) {
+            if (dailyData[startDate]) dailyData[startDate].activeTimeSecs += diffSecs;
+          } else {
+            // Distribute evenly across spanned days
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const dayCount = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+            const perDay = Math.floor(diffSecs / dayCount);
+            for (let d = 0; d < dayCount; d++) {
+              const dayStr = new Date(start.getTime() + d * 86_400_000).toISOString().split("T")[0];
+              if (dailyData[dayStr]) dailyData[dayStr].activeTimeSecs += perDay;
+            }
+          }
+        }
       }
 
       // Record session data (only if it had any tokens)
@@ -515,6 +567,11 @@ export function scanAllProjects(options: ScanOptions = {}): SubmissionPayload | 
       totalTokens: data.totalTokens,
       totalCost: Math.round(data.cost * 100) / 100,
       modelsUsed: Object.keys(data.models),
+      linesAdded: data.linesAdded,
+      linesRemoved: data.linesRemoved,
+      commitsCount: data.commitsCount,
+      pullRequestsCount: data.pullRequestsCount,
+      activeTimeSecs: data.activeTimeSecs,
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -544,8 +601,8 @@ export function scanAllProjects(options: ScanOptions = {}): SubmissionPayload | 
     modelsUsed: Object.keys(models),
     dailyBreakdown,
     dateRange: {
-      start: firstTimestamp ? new Date(firstTimestamp).toISOString().split("T")[0] : "1970-01-01",
-      end: lastTimestamp ? new Date(lastTimestamp).toISOString().split("T")[0] : "1970-01-01",
+      start: firstTimestamp ? kstDateStr(new Date(firstTimestamp)) : "1970-01-01",
+      end: lastTimestamp ? kstDateStr(new Date(lastTimestamp)) : "1970-01-01",
     },
     activity,
     sessions: sessionsList,

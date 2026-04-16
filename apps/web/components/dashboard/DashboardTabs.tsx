@@ -30,7 +30,7 @@ interface ProjectRow {
 }
 
 interface DashboardTabsProps {
-  stats: { label: string; value: string }[];
+  stats: { label: string; value: string; tooltip?: string }[];
   dailyData: DailyBreakdown[];
   modelData: { name: string; value: number }[];
   toolData: { name: string; value: number }[];
@@ -55,7 +55,7 @@ export function DashboardTabs({ stats, dailyData, modelData, toolData, taskData,
       {/* Stats grid - always visible */}
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
         {stats.map((s) => (
-          <div key={s.label} className="rounded-lg border border-border p-3 space-y-1">
+          <div key={s.label} className="rounded-lg border border-border p-3 space-y-1" title={s.tooltip ?? ""}>
             <p className="text-xs text-muted-foreground">{s.label}</p>
             <p className="text-lg font-bold font-mono text-foreground">{s.value}</p>
           </div>

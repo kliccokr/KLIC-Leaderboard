@@ -6,17 +6,9 @@ import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 import { DashboardPeriodFilter } from "@/components/dashboard/DashboardPeriodFilter";
 import { RefreshButton } from "@/components/dashboard/RefreshButton";
 import type { DailyBreakdown } from "@klic/shared";
+import { backfillDailyActivity, getPeriodRange } from "@/lib/dashboard-helpers";
 
 export const dynamic = "force-dynamic";
-
-function getPeriodRange(period: string): { start: Date; end: Date } | null {
-  if (period === "all") return null;
-  const days = period === "1d" ? 1 : period === "3d" ? 3 : period === "5d" ? 5 : period === "7d" ? 7 : period === "30d" ? 30 : 90;
-  const end = new Date();
-  const start = new Date(Date.now() - days * 86_400_000);
-  start.setHours(0, 0, 0, 0);
-  return { start, end };
-}
 
 function fmtTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -41,7 +33,7 @@ export default async function MyDashboardPage({
   const session = await auth();
   if (!session?.user?.email) redirect("/ko/login");
 
-  const { period = "30d" } = await searchParams;
+  const { period = "1d" } = await searchParams;
   const range = getPeriodRange(period);
 
   const user = await db.query.users.findFirst({
@@ -81,6 +73,11 @@ export default async function MyDashboardPage({
         existing.cacheReadTokens += d.cacheReadTokens;
         existing.totalTokens += d.totalTokens;
         existing.totalCost += d.totalCost;
+        existing.linesAdded = (existing.linesAdded ?? 0) + (d.linesAdded ?? 0);
+        existing.linesRemoved = (existing.linesRemoved ?? 0) + (d.linesRemoved ?? 0);
+        existing.commitsCount = (existing.commitsCount ?? 0) + (d.commitsCount ?? 0);
+        existing.pullRequestsCount = (existing.pullRequestsCount ?? 0) + (d.pullRequestsCount ?? 0);
+        existing.activeTimeSecs = (existing.activeTimeSecs ?? 0) + (d.activeTimeSecs ?? 0);
       } else {
         dailyMap.set(d.date, { ...d });
       }
@@ -88,15 +85,18 @@ export default async function MyDashboardPage({
   }
   const dailyData = [...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date));
 
+  // Backfill activity data for old submissions that lack per-day fields
+  backfillDailyActivity(dailyData, userSubmissions, rangeStart, rangeEnd);
+
   // Totals from filtered daily data (matches leaderboard calculation)
   const totalTokens = dailyData.reduce((s, d) => s + d.totalTokens, 0);
   const totalCost = dailyData.reduce((s, d) => s + d.totalCost, 0);
 
-  // Activity stats from submission-level (proportional to filtered days)
-  const totalActiveTimeSecs = userSubmissions.reduce((s, r) => s + (r.activeTimeSecs ?? 0), 0);
-  const totalCommits = userSubmissions.reduce((s, r) => s + (r.commitsCount ?? 0), 0);
-  const totalPRs = userSubmissions.reduce((s, r) => s + (r.pullRequestsCount ?? 0), 0);
-  const totalLinesAdded = userSubmissions.reduce((s, r) => s + (r.linesAdded ?? 0), 0);
+  // Activity stats from filtered daily breakdown (not submission-level totals)
+  const totalActiveTimeSecs = dailyData.reduce((s, d) => s + (d.activeTimeSecs ?? 0), 0);
+  const totalCommits = dailyData.reduce((s, d) => s + (d.commitsCount ?? 0), 0);
+  const totalPRs = dailyData.reduce((s, d) => s + (d.pullRequestsCount ?? 0), 0);
+  const totalLinesAdded = dailyData.reduce((s, d) => s + (d.linesAdded ?? 0), 0);
 
   // Model breakdown (from filtered daily data)
   const modelMap = new Map<string, number>();
@@ -174,9 +174,13 @@ export default async function MyDashboardPage({
 
   const activeDays = dailyData.filter((d) => d.totalTokens > 0).length;
 
+  // Count registered PCs (distinct sources)
+  const pcCount = new Set(userSubmissions.map((s) => s.source)).size;
+
   const stats = [
     { label: "총 토큰", value: fmtTokens(totalTokens) },
-    { label: "총 비용", value: `$${totalCost.toFixed(2)}` },
+    { label: "총 비용", value: `$${totalCost.toFixed(2)}`, tooltip: "API 비용 추정치 (토큰 단가 기준)" },
+    { label: "등록 PC", value: `${pcCount}대` },
     { label: "세션 수", value: totalSessions.toLocaleString() },
     { label: "총 턴", value: totalTurns.toLocaleString() },
     { label: "활성 일수", value: `${activeDays}일` },
