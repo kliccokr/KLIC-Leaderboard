@@ -38,14 +38,13 @@ function computeWindow(
 ): { pct: number; detail: string } | null {
   if (pct === null) return null;
   const clamped = Math.max(0, Math.min(100, pct));
-  const usedMins = (clamped / 100) * totalMins;
-  const usedLabel = `${formatter(usedMins)}/${totalLabel}`;
-  let detail = `(${usedLabel})`;
+  let detail: string;
   if (resetsAt) {
-    const remMs = new Date(resetsAt).getTime() - now;
-    if (remMs > 0) {
-      detail = `(${usedLabel} →${formatter(remMs / 60000)})`;
-    }
+    const remMins = Math.max(0, (new Date(resetsAt).getTime() - now) / 60000);
+    const elapsedMins = Math.max(0, Math.min(totalMins, totalMins - remMins));
+    detail = `(${formatter(elapsedMins)}/${totalLabel} →${formatter(remMins)})`;
+  } else {
+    detail = `(${formatter((clamped / 100) * totalMins)}/${totalLabel})`;
   }
   return { pct: clamped, detail };
 }
