@@ -145,6 +145,8 @@ function readRateLimits(): RateLimits | null {
 
     const fiveHourPct = data?.rate_limits?.five_hour?.used_percentage ?? null;
     const sevenDayPct = data?.rate_limits?.seven_day?.used_percentage ?? null;
+    const fiveHourResetsAt = data?.rate_limits?.five_hour?.resets_at ?? null;
+    const sevenDayResetsAt = data?.rate_limits?.seven_day?.resets_at ?? null;
     const timestamp = data?.timestamp ?? null;
 
     if (fiveHourPct === null && sevenDayPct === null) return null;
@@ -152,6 +154,8 @@ function readRateLimits(): RateLimits | null {
     return {
       fiveHourUsedPct: fiveHourPct !== null ? Number(fiveHourPct) : null,
       sevenDayUsedPct: sevenDayPct !== null ? Number(sevenDayPct) : null,
+      fiveHourResetsAt: fiveHourResetsAt !== null ? Number(fiveHourResetsAt) : null,
+      sevenDayResetsAt: sevenDayResetsAt !== null ? Number(sevenDayResetsAt) : null,
       updatedAt: timestamp,
     };
   } catch {

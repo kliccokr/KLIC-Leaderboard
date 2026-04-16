@@ -44,6 +44,8 @@ export interface SessionData {
 export interface RateLimits {
   fiveHourUsedPct: number | null;
   sevenDayUsedPct: number | null;
+  fiveHourResetsAt: number | null;
+  sevenDayResetsAt: number | null;
   updatedAt: string | null;
 }
 
@@ -79,5 +81,7 @@ export interface LeaderboardEntry {
   submittedAt: string;
   fiveHourUsedPct: number | null;
   sevenDayUsedPct: number | null;
+  fiveHourResetsAt: string | null;
+  sevenDayResetsAt: string | null;
   rateLimitUpdatedAt: string | null;
 }

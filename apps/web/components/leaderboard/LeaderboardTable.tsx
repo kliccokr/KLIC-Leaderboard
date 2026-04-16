@@ -12,18 +12,31 @@ interface Props {
   totalCount?: number;
 }
 
-function computeFiveHour(fiveHourPct: number | null, updatedAt: string | null, now: number): { pct: number; agoLabel: string } | null {
+function formatHM(totalMins: number): string {
+  const m = Math.max(0, Math.round(totalMins));
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  if (h > 0) return `${h}h${rem}m`;
+  return `${rem}m`;
+}
+
+function computeFiveHour(
+  fiveHourPct: number | null,
+  resetsAt: string | null,
+  now: number,
+): { pct: number; detail: string } | null {
   if (fiveHourPct === null) return null;
   const pct = Math.max(0, Math.min(100, fiveHourPct));
-  let agoLabel = "";
-  if (updatedAt) {
-    const elapsedMs = now - new Date(updatedAt).getTime();
-    const mins = Math.max(0, Math.floor(elapsedMs / 60000));
-    if (mins < 1) agoLabel = "방금";
-    else if (mins < 60) agoLabel = `${mins}분 전`;
-    else agoLabel = `${Math.floor(mins / 60)}시간 전`;
+  const usedMins = (pct / 100) * 300;
+  const usedLabel = `${formatHM(usedMins)}/5h`;
+  let detail = `(${usedLabel})`;
+  if (resetsAt) {
+    const remMs = new Date(resetsAt).getTime() - now;
+    if (remMs > 0) {
+      detail = `(${usedLabel} →${formatHM(remMs / 60000)})`;
+    }
   }
-  return { pct, agoLabel };
+  return { pct, detail };
 }
 
 function ProgressBar({ pct }: { pct: number }) {
@@ -43,7 +56,7 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
   const calculatedLevel = calculateLevel(entry.totalTokens);
   const levelName = locale === "ko" ? calculatedLevel.info.nameKo : calculatedLevel.info.nameEn;
   const rankLabel = entry.rank <= 3 ? ["🥇", "🥈", "🥉"][entry.rank - 1] : `#${entry.rank}`;
-  const fiveHour = computeFiveHour(entry.fiveHourUsedPct, entry.rateLimitUpdatedAt, now);
+  const fiveHour = computeFiveHour(entry.fiveHourUsedPct, entry.fiveHourResetsAt, now);
 
   return (
     <div className="rounded-lg border border-border p-4 space-y-2">
@@ -74,7 +87,7 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
         </div>
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>5H: <span className="font-mono">{fiveHour ? `${Math.round(fiveHour.pct)}%` : "N/A"}</span></span>
+        <span>5H: <span className="font-mono">{fiveHour ? `${Math.round(fiveHour.pct)}% ${fiveHour.detail}` : "N/A"}</span></span>
         {entry.sevenDayUsedPct !== null && (
           <span>7D: <span className="font-mono">{Math.round(entry.sevenDayUsedPct)}%</span></span>
         )}
@@ -180,7 +193,7 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
             {visibleEntries.map((entry) => {
               const calculatedLevel = calculateLevel(entry.totalTokens);
               const levelName = locale === "ko" ? calculatedLevel.info.nameKo : calculatedLevel.info.nameEn;
-              const fiveHour = computeFiveHour(entry.fiveHourUsedPct, entry.rateLimitUpdatedAt, now);
+              const fiveHour = computeFiveHour(entry.fiveHourUsedPct, entry.fiveHourResetsAt, now);
               return (
                 <tr key={entry.userId} className="hover:bg-muted/30 transition-colors">
                   <td className="px-3 py-3 font-bold text-muted-foreground whitespace-nowrap">
@@ -205,7 +218,10 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
                   </td>
                   <td className="px-3 py-3">
                     {fiveHour ? (
-                      <ProgressBar pct={fiveHour.pct} />
+                      <div className="flex flex-col gap-0.5">
+                        <ProgressBar pct={fiveHour.pct} />
+                        <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">{fiveHour.detail}</span>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">N/A</span>
                     )}

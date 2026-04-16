@@ -37,6 +37,8 @@ const sessionDataSchema = z.object({
 const rateLimitsSchema = z.object({
   fiveHourUsedPct: z.number().nullable().default(null),
   sevenDayUsedPct: z.number().nullable().default(null),
+  fiveHourResetsAt: z.number().nullable().default(null),
+  sevenDayResetsAt: z.number().nullable().default(null),
   updatedAt: z.string().nullable().default(null),
 }).optional();
 
@@ -114,6 +116,8 @@ export async function POST(req: Request): Promise<Response> {
         await tx.update(users).set({
           fiveHourUsedPct: payload.rateLimits.fiveHourUsedPct != null ? String(payload.rateLimits.fiveHourUsedPct) : null,
           sevenDayUsedPct: payload.rateLimits.sevenDayUsedPct != null ? String(payload.rateLimits.sevenDayUsedPct) : null,
+          fiveHourResetsAt: payload.rateLimits.fiveHourResetsAt != null ? new Date(payload.rateLimits.fiveHourResetsAt * 1000) : null,
+          sevenDayResetsAt: payload.rateLimits.sevenDayResetsAt != null ? new Date(payload.rateLimits.sevenDayResetsAt * 1000) : null,
           rateLimitUpdatedAt: payload.rateLimits.updatedAt ? new Date(payload.rateLimits.updatedAt) : new Date(),
         }).where(eq(users.id, foundKey.userId));
       }

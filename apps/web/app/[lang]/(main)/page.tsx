@@ -60,6 +60,8 @@ export default async function LeaderboardPage({
     submittedAt: string | null;
     fiveHourUsedPct: number | null;
     sevenDayUsedPct: number | null;
+    fiveHourResetsAt: Date | null;
+    sevenDayResetsAt: Date | null;
     rateLimitUpdatedAt: Date | null;
   }>(sql`
     WITH daily AS (
@@ -103,6 +105,8 @@ export default async function LeaderboardPage({
       l.submitted_at AS "submittedAt",
       u.five_hour_used_pct AS "fiveHourUsedPct",
       u.seven_day_used_pct AS "sevenDayUsedPct",
+      u.five_hour_resets_at AS "fiveHourResetsAt",
+      u.seven_day_resets_at AS "sevenDayResetsAt",
       u.rate_limit_updated_at AS "rateLimitUpdatedAt"
     FROM users u
     LEFT JOIN aggregated a ON a.user_id = u.id
@@ -129,6 +133,8 @@ export default async function LeaderboardPage({
     submittedAt: r.submittedAt ? new Date(r.submittedAt).toISOString() : "",
     fiveHourUsedPct: r.fiveHourUsedPct != null ? Number(r.fiveHourUsedPct) : null,
     sevenDayUsedPct: r.sevenDayUsedPct != null ? Number(r.sevenDayUsedPct) : null,
+    fiveHourResetsAt: r.fiveHourResetsAt ? new Date(r.fiveHourResetsAt).toISOString() : null,
+    sevenDayResetsAt: r.sevenDayResetsAt ? new Date(r.sevenDayResetsAt).toISOString() : null,
     rateLimitUpdatedAt: r.rateLimitUpdatedAt ? new Date(r.rateLimitUpdatedAt).toISOString() : null,
   }));
 

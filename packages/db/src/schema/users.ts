@@ -16,6 +16,8 @@ export const users = pgTable("users", {
   lastSubmissionAt: timestamp("last_submission_at", { mode: "date" }),
   fiveHourUsedPct: numeric("five_hour_used_pct", { precision: 5, scale: 2 }),
   sevenDayUsedPct: numeric("seven_day_used_pct", { precision: 5, scale: 2 }),
+  fiveHourResetsAt: timestamp("five_hour_resets_at", { mode: "date" }),
+  sevenDayResetsAt: timestamp("seven_day_resets_at", { mode: "date" }),
   rateLimitUpdatedAt: timestamp("rate_limit_updated_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
