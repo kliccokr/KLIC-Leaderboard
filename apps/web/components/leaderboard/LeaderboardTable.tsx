@@ -20,23 +20,42 @@ function formatHM(totalMins: number): string {
   return `${rem}m`;
 }
 
-function computeFiveHour(
-  fiveHourPct: number | null,
+function formatDH(totalMins: number): string {
+  const m = Math.max(0, Math.round(totalMins));
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  if (d > 0) return `${d}d${h}h`;
+  return `${h}h`;
+}
+
+function computeWindow(
+  pct: number | null,
   resetsAt: string | null,
   now: number,
+  totalMins: number,
+  totalLabel: string,
+  formatter: (mins: number) => string,
 ): { pct: number; detail: string } | null {
-  if (fiveHourPct === null) return null;
-  const pct = Math.max(0, Math.min(100, fiveHourPct));
-  const usedMins = (pct / 100) * 300;
-  const usedLabel = `${formatHM(usedMins)}/5h`;
+  if (pct === null) return null;
+  const clamped = Math.max(0, Math.min(100, pct));
+  const usedMins = (clamped / 100) * totalMins;
+  const usedLabel = `${formatter(usedMins)}/${totalLabel}`;
   let detail = `(${usedLabel})`;
   if (resetsAt) {
     const remMs = new Date(resetsAt).getTime() - now;
     if (remMs > 0) {
-      detail = `(${usedLabel} →${formatHM(remMs / 60000)})`;
+      detail = `(${usedLabel} →${formatter(remMs / 60000)})`;
     }
   }
-  return { pct, detail };
+  return { pct: clamped, detail };
+}
+
+function computeFiveHour(pct: number | null, resetsAt: string | null, now: number) {
+  return computeWindow(pct, resetsAt, now, 300, "5h", formatHM);
+}
+
+function computeSevenDay(pct: number | null, resetsAt: string | null, now: number) {
+  return computeWindow(pct, resetsAt, now, 7 * 24 * 60, "7d", formatDH);
 }
 
 function ProgressBar({ pct }: { pct: number }) {
@@ -57,6 +76,7 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
   const levelName = locale === "ko" ? calculatedLevel.info.nameKo : calculatedLevel.info.nameEn;
   const rankLabel = entry.rank <= 3 ? ["🥇", "🥈", "🥉"][entry.rank - 1] : `#${entry.rank}`;
   const fiveHour = computeFiveHour(entry.fiveHourUsedPct, entry.fiveHourResetsAt, now);
+  const sevenDay = computeSevenDay(entry.sevenDayUsedPct, entry.sevenDayResetsAt, now);
 
   return (
     <div className="rounded-lg border border-border p-4 space-y-2">
@@ -88,9 +108,7 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>5H: <span className="font-mono">{fiveHour ? `${Math.round(fiveHour.pct)}% ${fiveHour.detail}` : "N/A"}</span></span>
-        {entry.sevenDayUsedPct !== null && (
-          <span>7D: <span className="font-mono">{Math.round(entry.sevenDayUsedPct)}%</span></span>
-        )}
+        <span>7D: <span className="font-mono">{sevenDay ? `${Math.round(sevenDay.pct)}% ${sevenDay.detail}` : "N/A"}</span></span>
       </div>
       {entry.sevenDayUsedPct !== null && (
         <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
@@ -194,6 +212,7 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
               const calculatedLevel = calculateLevel(entry.totalTokens);
               const levelName = locale === "ko" ? calculatedLevel.info.nameKo : calculatedLevel.info.nameEn;
               const fiveHour = computeFiveHour(entry.fiveHourUsedPct, entry.fiveHourResetsAt, now);
+              const sevenDay = computeSevenDay(entry.sevenDayUsedPct, entry.sevenDayResetsAt, now);
               return (
                 <tr key={entry.userId} className="hover:bg-muted/30 transition-colors">
                   <td className="px-3 py-3 font-bold text-muted-foreground whitespace-nowrap">
@@ -227,8 +246,11 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
                     )}
                   </td>
                   <td className="px-3 py-3">
-                    {entry.sevenDayUsedPct !== null ? (
-                      <ProgressBar pct={entry.sevenDayUsedPct} />
+                    {sevenDay ? (
+                      <div className="flex flex-col gap-0.5">
+                        <ProgressBar pct={sevenDay.pct} />
+                        <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">{sevenDay.detail}</span>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">N/A</span>
                     )}
