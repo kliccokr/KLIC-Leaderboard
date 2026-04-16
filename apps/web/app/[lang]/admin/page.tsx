@@ -3,6 +3,7 @@ import { db, users, submissions } from "@klic/db";
 import { sql } from "drizzle-orm";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { ResetThrottleButton } from "./ResetThrottleButton";
 
 export default async function AdminPage({
   params,
@@ -43,6 +44,7 @@ export default async function AdminPage({
               {t("syncDirectory")}
             </button>
           </form>
+          <ResetThrottleButton label={t("resetThrottle")} />
           <a
             href={`/api/admin/cost-report?month=${currentMonth}`}
             className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-500"

@@ -147,7 +147,7 @@ export default async function LeaderboardPage({
     .map((entry, index) => ({ rank: index + 1, ...entry }));
 
   return (
-    <div className="container max-w-4xl mx-auto py-4 sm:py-8 px-4 sm:px-6 space-y-6">
+    <div className="container max-w-6xl mx-auto py-4 sm:py-8 px-4 sm:px-6 space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">{t("title")}</h1>

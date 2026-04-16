@@ -12,20 +12,18 @@ interface Props {
   totalCount?: number;
 }
 
-function computeFiveHour(fiveHourPct: number | null, updatedAt: string | null, now: number): string {
-  if (fiveHourPct === null) return "N/A";
-  const usedMinsAtCheck = (fiveHourPct / 100) * 300;
-  let totalUsedMins = usedMinsAtCheck;
+function computeFiveHour(fiveHourPct: number | null, updatedAt: string | null, now: number): { pct: number; agoLabel: string } | null {
+  if (fiveHourPct === null) return null;
+  const pct = Math.max(0, Math.min(100, fiveHourPct));
+  let agoLabel = "";
   if (updatedAt) {
     const elapsedMs = now - new Date(updatedAt).getTime();
-    totalUsedMins = usedMinsAtCheck + elapsedMs / 60000;
+    const mins = Math.max(0, Math.floor(elapsedMs / 60000));
+    if (mins < 1) agoLabel = "방금";
+    else if (mins < 60) agoLabel = `${mins}분 전`;
+    else agoLabel = `${Math.floor(mins / 60)}시간 전`;
   }
-  totalUsedMins = Math.min(totalUsedMins, 300);
-  const remaining = 300 - totalUsedMins;
-  if (remaining <= 0) return "초기화 대기";
-  const rh = Math.floor(remaining / 60);
-  const rm = Math.ceil(remaining % 60);
-  return `${rh}h${rm < 10 ? "0" : ""}${rm}m`;
+  return { pct, agoLabel };
 }
 
 function ProgressBar({ pct }: { pct: number }) {
@@ -45,7 +43,7 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
   const calculatedLevel = calculateLevel(entry.totalTokens);
   const levelName = locale === "ko" ? calculatedLevel.info.nameKo : calculatedLevel.info.nameEn;
   const rankLabel = entry.rank <= 3 ? ["🥇", "🥈", "🥉"][entry.rank - 1] : `#${entry.rank}`;
-  const resetTimer = computeFiveHour(entry.fiveHourUsedPct, entry.rateLimitUpdatedAt, now);
+  const fiveHour = computeFiveHour(entry.fiveHourUsedPct, entry.rateLimitUpdatedAt, now);
 
   return (
     <div className="rounded-lg border border-border p-4 space-y-2">
@@ -76,9 +74,9 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
         </div>
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>초기화: <span className="font-mono">{resetTimer}</span></span>
+        <span>5H: <span className="font-mono">{fiveHour ? `${Math.round(fiveHour.pct)}%` : "N/A"}</span></span>
         {entry.sevenDayUsedPct !== null && (
-          <span>7일: <span className="font-mono">{Math.round(entry.sevenDayUsedPct)}%</span></span>
+          <span>7D: <span className="font-mono">{Math.round(entry.sevenDayUsedPct)}%</span></span>
         )}
       </div>
       {entry.sevenDayUsedPct !== null && (
@@ -169,45 +167,50 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">순위</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">이름</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">레벨</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">토큰</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">비용</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">초기화</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">사용량</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-muted-foreground whitespace-nowrap">순위</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-muted-foreground">이름</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-muted-foreground whitespace-nowrap">레벨</th>
+              <th className="px-3 py-3 text-right text-sm font-medium text-muted-foreground whitespace-nowrap">토큰</th>
+              <th className="px-3 py-3 text-right text-sm font-medium text-muted-foreground whitespace-nowrap">비용</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-muted-foreground whitespace-nowrap">사용량(5H)</th>
+              <th className="px-3 py-3 text-left text-sm font-medium text-muted-foreground whitespace-nowrap">사용량(7D)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {visibleEntries.map((entry) => {
               const calculatedLevel = calculateLevel(entry.totalTokens);
               const levelName = locale === "ko" ? calculatedLevel.info.nameKo : calculatedLevel.info.nameEn;
+              const fiveHour = computeFiveHour(entry.fiveHourUsedPct, entry.rateLimitUpdatedAt, now);
               return (
                 <tr key={entry.userId} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-bold text-muted-foreground">
+                  <td className="px-3 py-3 font-bold text-muted-foreground whitespace-nowrap">
                     {entry.rank <= 3 ? ["🥇", "🥈", "🥉"][entry.rank - 1] : `#${entry.rank}`}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     <Link href={`/${locale}/profile/${entry.email.split("@")[0]}`} className="font-medium text-foreground hover:underline">
                       {entry.name}
                     </Link>
                     {entry.orgUnit && (
-                      <Link href={`/${locale}/team/${encodeURIComponent(entry.orgUnit)}`} className="ml-2 text-xs text-muted-foreground hover:underline">
+                      <Link href={`/${locale}/team/${encodeURIComponent(entry.orgUnit)}`} className="block text-xs text-muted-foreground hover:underline">
                         {entry.orgUnit}
                       </Link>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{levelName ?? `Lv.${entry.level}`}</td>
-                  <td className="px-4 py-3 text-right font-mono text-foreground">
+                  <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{levelName ?? `Lv.${entry.level}`}</td>
+                  <td className="px-3 py-3 text-right font-mono text-foreground whitespace-nowrap">
                     {(entry.totalTokens / 1_000_000).toFixed(2)}M
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-foreground">
+                  <td className="px-3 py-3 text-right font-mono text-foreground whitespace-nowrap">
                     ${Number(entry.totalCost).toFixed(2)}
                   </td>
-                  <td className="px-4 py-3 text-center font-mono text-xs text-muted-foreground whitespace-nowrap">
-                    {computeFiveHour(entry.fiveHourUsedPct, entry.rateLimitUpdatedAt, now)}
+                  <td className="px-3 py-3">
+                    {fiveHour ? (
+                      <ProgressBar pct={fiveHour.pct} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">N/A</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     {entry.sevenDayUsedPct !== null ? (
                       <ProgressBar pct={entry.sevenDayUsedPct} />
                     ) : (

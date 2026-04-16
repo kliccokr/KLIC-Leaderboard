@@ -32,7 +32,8 @@
     "users": "전체 직원",
     "syncDirectory": "Directory 동기화",
     "downloadReport": "CSV 다운로드",
-    "linkAccounts": "계정 수동 연동"
+    "linkAccounts": "계정 수동 연동",
+    "resetThrottle": "제출 throttle 해제"
   },
   "auth": {
     "loginTitle": "KLIC 리더보드",

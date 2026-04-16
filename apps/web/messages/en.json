@@ -32,7 +32,8 @@
     "users": "All Users",
     "syncDirectory": "Sync Directory",
     "downloadReport": "Download CSV",
-    "linkAccounts": "Manual Account Link"
+    "linkAccounts": "Manual Account Link",
+    "resetThrottle": "Clear Submit Throttle"
   },
   "auth": {
     "loginTitle": "KLIC Leaderboard",
