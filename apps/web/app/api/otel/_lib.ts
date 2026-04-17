@@ -1,18 +1,52 @@
 import { createHash } from "crypto";
-import { db, apiKeys } from "@klic/db";
-import { eq } from "drizzle-orm";
+import { db, apiKeys, users } from "@klic/db";
+import { eq, inArray } from "drizzle-orm";
 
 // ─── Authentication ──────────────────────────────────────────────────────────
 
-export async function authenticateBearer(req: Request): Promise<{ userId: string } | null> {
+export type AuthContext = { kind: "user"; userId: string } | { kind: "org" };
+
+export async function authenticate(req: Request): Promise<AuthContext | null> {
   const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
   if (!authHeader?.toLowerCase().startsWith("bearer ")) return null;
   const rawKey = authHeader.slice(7).trim();
   if (!rawKey) return null;
+
+  const orgToken = process.env.OTEL_ORG_TOKEN;
+  if (orgToken && rawKey === orgToken) return { kind: "org" };
+
   const keyHash = createHash("sha256").update(rawKey).digest("hex");
   const found = await db.query.apiKeys.findFirst({ where: eq(apiKeys.keyHash, keyHash) });
   if (!found) return null;
-  return { userId: found.userId };
+  return { kind: "user", userId: found.userId };
+}
+
+// ─── Email → userId resolution (for org-token requests) ──────────────────────
+
+const ALLOWED_EMAIL_DOMAINS = ["klic.co.kr", "klic.kr"];
+
+export function normalizeOrgEmail(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const email = v.trim().toLowerCase();
+  const at = email.lastIndexOf("@");
+  if (at < 1) return null;
+  const domain = email.slice(at + 1);
+  if (!ALLOWED_EMAIL_DOMAINS.includes(domain)) return null;
+  return email;
+}
+
+export async function resolveEmailsToUserIds(emails: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(emails)];
+  if (unique.length === 0) return new Map();
+  const rows = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(inArray(users.email, unique));
+  const map = new Map<string, string>();
+  for (const r of rows) {
+    if (r.email) map.set(r.email.toLowerCase(), r.id);
+  }
+  return map;
 }
 
 // ─── OTLP JSON primitives ────────────────────────────────────────────────────

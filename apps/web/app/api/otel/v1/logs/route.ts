@@ -2,7 +2,12 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 import { db, otelEvents } from "@klic/db";
-import { authenticateBearer, extractEvents } from "../../_lib";
+import {
+  authenticate,
+  extractEvents,
+  normalizeOrgEmail,
+  resolveEmailsToUserIds,
+} from "../../_lib";
 
 const ACCEPTED_EVENTS = new Set([
   "user_prompt",
@@ -13,7 +18,7 @@ const ACCEPTED_EVENTS = new Set([
 ]);
 
 export async function POST(req: Request): Promise<Response> {
-  const auth = await authenticateBearer(req);
+  const auth = await authenticate(req);
   if (!auth) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const ct = req.headers.get("content-type") ?? "";
@@ -27,15 +32,47 @@ export async function POST(req: Request): Promise<Response> {
   const events = extractEvents(body).filter((e) => ACCEPTED_EVENTS.has(e.name));
   if (events.length === 0) return Response.json({ partialSuccess: {} });
 
-  const rows = events.map((e) => ({
-    userId: auth.userId,
-    eventName: e.name,
-    observedAt: e.observedAt,
-    promptId: e.promptId,
-    sessionId: e.sessionId,
-    attrs: e.attrs,
-  }));
+  const rows: {
+    userId: string;
+    eventName: string;
+    observedAt: Date;
+    promptId: string | null;
+    sessionId: string | null;
+    attrs: Record<string, unknown>;
+  }[] = [];
 
-  await db.insert(otelEvents).values(rows);
+  if (auth.kind === "user") {
+    for (const e of events) {
+      rows.push({
+        userId: auth.userId,
+        eventName: e.name,
+        observedAt: e.observedAt,
+        promptId: e.promptId,
+        sessionId: e.sessionId,
+        attrs: e.attrs,
+      });
+    }
+  } else {
+    const emails = events
+      .map((e) => normalizeOrgEmail(e.attrs["user.email"]))
+      .filter((v): v is string => v !== null);
+    const emailToUserId = await resolveEmailsToUserIds(emails);
+    for (const e of events) {
+      const email = normalizeOrgEmail(e.attrs["user.email"]);
+      if (!email) continue;
+      const userId = emailToUserId.get(email);
+      if (!userId) continue;
+      rows.push({
+        userId,
+        eventName: e.name,
+        observedAt: e.observedAt,
+        promptId: e.promptId,
+        sessionId: e.sessionId,
+        attrs: e.attrs,
+      });
+    }
+  }
+
+  if (rows.length > 0) await db.insert(otelEvents).values(rows);
   return Response.json({ partialSuccess: {} });
 }

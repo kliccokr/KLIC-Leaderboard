@@ -2,7 +2,12 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 import { db, otelMetricPoints } from "@klic/db";
-import { authenticateBearer, extractMetrics } from "../../_lib";
+import {
+  authenticate,
+  extractMetrics,
+  normalizeOrgEmail,
+  resolveEmailsToUserIds,
+} from "../../_lib";
 
 const ACCEPTED_METRICS = new Set([
   "claude_code.session.count",
@@ -16,7 +21,7 @@ const ACCEPTED_METRICS = new Set([
 ]);
 
 export async function POST(req: Request): Promise<Response> {
-  const auth = await authenticateBearer(req);
+  const auth = await authenticate(req);
   if (!auth) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const ct = req.headers.get("content-type") ?? "";
@@ -30,14 +35,44 @@ export async function POST(req: Request): Promise<Response> {
   const metrics = extractMetrics(body).filter((m) => ACCEPTED_METRICS.has(m.name));
   if (metrics.length === 0) return Response.json({ partialSuccess: {} });
 
-  const rows = metrics.map((m) => ({
-    userId: auth.userId,
-    metricName: m.name,
-    value: String(m.value),
-    observedAt: m.observedAt,
-    attrs: m.attrs,
-  }));
+  const rows: {
+    userId: string;
+    metricName: string;
+    value: string;
+    observedAt: Date;
+    attrs: Record<string, unknown>;
+  }[] = [];
 
-  await db.insert(otelMetricPoints).values(rows);
+  if (auth.kind === "user") {
+    for (const m of metrics) {
+      rows.push({
+        userId: auth.userId,
+        metricName: m.name,
+        value: String(m.value),
+        observedAt: m.observedAt,
+        attrs: m.attrs,
+      });
+    }
+  } else {
+    const emails = metrics
+      .map((m) => normalizeOrgEmail(m.attrs["user.email"]))
+      .filter((e): e is string => e !== null);
+    const emailToUserId = await resolveEmailsToUserIds(emails);
+    for (const m of metrics) {
+      const email = normalizeOrgEmail(m.attrs["user.email"]);
+      if (!email) continue;
+      const userId = emailToUserId.get(email);
+      if (!userId) continue;
+      rows.push({
+        userId,
+        metricName: m.name,
+        value: String(m.value),
+        observedAt: m.observedAt,
+        attrs: m.attrs,
+      });
+    }
+  }
+
+  if (rows.length > 0) await db.insert(otelMetricPoints).values(rows);
   return Response.json({ partialSuccess: {} });
 }
