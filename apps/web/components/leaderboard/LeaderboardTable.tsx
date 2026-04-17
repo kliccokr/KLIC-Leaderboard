@@ -13,19 +13,25 @@ interface Props {
 }
 
 function formatHM(totalMins: number): string {
-  const m = Math.max(0, Math.round(totalMins));
-  const h = Math.floor(m / 60);
-  const rem = m % 60;
-  if (h > 0) return `${h}h${rem}m`;
-  return `${rem}m`;
+  const totalSecs = Math.max(0, Math.floor(totalMins * 60));
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (h > 0) return `${h}h${m}m${s}s`;
+  if (m > 0) return `${m}m${s}s`;
+  return `${s}s`;
 }
 
 function formatDH(totalMins: number): string {
-  const m = Math.max(0, Math.round(totalMins));
-  const d = Math.floor(m / 1440);
-  const h = Math.floor((m % 1440) / 60);
-  if (d > 0) return `${d}d${h}h`;
-  return `${h}h`;
+  const totalSecs = Math.max(0, Math.floor(totalMins * 60));
+  const d = Math.floor(totalSecs / 86400);
+  const h = Math.floor((totalSecs % 86400) / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (d > 0) return `${d}d${h}h${m}m`;
+  if (h > 0) return `${h}h${m}m${s}s`;
+  if (m > 0) return `${m}m${s}s`;
+  return `${s}s`;
 }
 
 function computeWindow(
@@ -138,7 +144,7 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
   const hasMore = !hasSearch && entries.length > DEFAULT_COUNT;
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
