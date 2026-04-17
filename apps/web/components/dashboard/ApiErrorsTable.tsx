@@ -16,13 +16,20 @@ function fmtDuration(ms: number | null): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function statusColor(code: string | null): string {
+  if (!code) return "text-muted-foreground";
+  if (code.startsWith("5")) return "text-red-500";
+  if (code.startsWith("4")) return "text-amber-500";
+  return "text-muted-foreground";
+}
+
 export function ApiErrorsTable({ errors }: { errors: RecentApiError[] }) {
   if (errors.length === 0) return null;
 
   return (
     <div className="rounded-lg border border-border p-4 space-y-3">
       <div className="flex items-baseline justify-between">
-        <h3 className="font-medium text-sm text-muted-foreground">최근 API 에러 (최신 20건)</h3>
+        <h3 className="font-medium text-sm text-muted-foreground">최근 API 에러 (최신 {errors.length}건)</h3>
         <span className="text-[11px] text-muted-foreground">claude_code.api_error</span>
       </div>
       <div className="overflow-x-auto">
@@ -40,14 +47,17 @@ export function ApiErrorsTable({ errors }: { errors: RecentApiError[] }) {
           <tbody>
             {errors.map((e, i) => (
               <tr key={i} className="border-b border-border/50 last:border-0">
-                <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground font-mono text-xs">
+                <td
+                  className="py-2 pr-3 whitespace-nowrap text-muted-foreground font-mono text-xs"
+                  title={e.observedAt.toISOString()}
+                >
                   {fmtRelative(e.observedAt)}
                 </td>
                 <td className="py-2 pr-3 whitespace-nowrap text-foreground text-xs">
                   {e.model ?? "-"}
                 </td>
                 <td className="py-2 pr-3 whitespace-nowrap font-mono text-xs">
-                  <span className={e.statusCode && e.statusCode.startsWith("5") ? "text-red-500" : "text-amber-500"}>
+                  <span className={statusColor(e.statusCode)}>
                     {e.statusCode ?? "-"}
                   </span>
                 </td>
