@@ -24,6 +24,13 @@ interface HourBucket {
   errors: number;
 }
 
+interface LangBucket {
+  language: string;
+  accept: number;
+  reject: number;
+  total: number;
+}
+
 interface Props {
   apiCalls24h: number;
   apiErrors24h: number;
@@ -33,7 +40,15 @@ interface Props {
   toolAcceptRate: number | null;  // 0..1
   hourlyBuckets: HourBucket[];
   modelCosts: ModelCost[];
+  avgDurationMs: number | null;
+  fastPct: number | null;  // 0..100
+  languageBreakdown: LangBucket[];
   hasData: boolean;
+}
+
+function fmtDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 function Card({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -114,6 +129,44 @@ export function RealtimeSection(props: Props) {
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Card
+          label="평균 응답시간"
+          value={props.avgDurationMs != null ? fmtDuration(props.avgDurationMs) : "-"}
+          sub="api_request duration_ms"
+        />
+        <Card
+          label="Fast 모드 비율"
+          value={props.fastPct != null ? `${props.fastPct.toFixed(0)}%` : "-"}
+          sub={props.fastPct != null ? `나머지 ${(100 - props.fastPct).toFixed(0)}% normal` : undefined}
+        />
+      </div>
+
+      {props.languageBreakdown.length > 0 && (
+        <div className="rounded-lg border border-border p-4 space-y-3">
+          <h3 className="font-medium text-sm text-muted-foreground">언어별 편집 수락률 (24h)</h3>
+          <div className="space-y-2">
+            {props.languageBreakdown.map((l) => {
+              const acceptPct = l.total > 0 ? (l.accept / l.total) * 100 : 0;
+              return (
+                <div key={l.language} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-foreground">{l.language}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {Math.round(acceptPct)}% 수락 · {l.total.toLocaleString()}건
+                    </span>
+                  </div>
+                  <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+                    <div className="bg-emerald-500" style={{ width: `${acceptPct}%` }} />
+                    <div className="bg-red-500" style={{ width: `${100 - acceptPct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

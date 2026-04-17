@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { db, users, submissions, userSessions, otelEvents } from "@klic/db";
+import { db, users, submissions, userSessions, otelEvents, otelMetricPoints } from "@klic/db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 import { DashboardPeriodFilter } from "@/components/dashboard/DashboardPeriodFilter";
@@ -230,6 +230,52 @@ export default async function MyDashboardPage({
 
   const otelHasData = otelRows.length > 0;
 
+  // api_request duration + speed aggregates
+  let durationSum = 0;
+  let durationCount = 0;
+  let fastCount = 0;
+  let normalCount = 0;
+  for (const ev of otelRows) {
+    if (ev.eventName !== "api_request") continue;
+    const attrs = (ev.attrs ?? {}) as Record<string, unknown>;
+    const dur = typeof attrs.duration_ms === "number" ? attrs.duration_ms : null;
+    if (dur != null) {
+      durationSum += dur;
+      durationCount++;
+    }
+    const speed = attrs.speed;
+    if (speed === "fast") fastCount++;
+    else if (speed === "normal") normalCount++;
+  }
+  const avgDurationMs = durationCount > 0 ? durationSum / durationCount : null;
+  const speedTotal = fastCount + normalCount;
+  const fastPct = speedTotal > 0 ? (fastCount / speedTotal) * 100 : null;
+
+  // Language edit breakdown from code_edit_tool.decision metric (24h)
+  const langRows = await db.execute<{ language: string; decision: string; count: string }>(sql`
+    SELECT
+      coalesce(attrs->>'language', 'unknown') AS language,
+      coalesce(attrs->>'decision', 'unknown') AS decision,
+      sum(value::numeric) AS count
+    FROM otel_metric_points
+    WHERE user_id = ${user.id}
+      AND metric_name = 'claude_code.code_edit_tool.decision'
+      AND observed_at >= now() - interval '24 hours'
+    GROUP BY 1, 2
+  `);
+  const langMap = new Map<string, { accept: number; reject: number }>();
+  for (const r of langRows) {
+    const cur = langMap.get(r.language) ?? { accept: 0, reject: 0 };
+    const count = Number(r.count);
+    if (r.decision === "accept") cur.accept += count;
+    else if (r.decision === "reject") cur.reject += count;
+    langMap.set(r.language, cur);
+  }
+  const languageBreakdown = [...langMap.entries()]
+    .map(([language, v]) => ({ language, accept: v.accept, reject: v.reject, total: v.accept + v.reject }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8);
+
   const stats = [
     { label: "총 토큰", value: fmtTokens(totalTokens) },
     { label: "총 비용", value: `$${totalCost.toFixed(2)}`, tooltip: "API 비용 추정치 (토큰 단가 기준)" },
@@ -279,6 +325,9 @@ export default async function MyDashboardPage({
         toolAcceptRate={toolAcceptRate}
         hourlyBuckets={hourBuckets}
         modelCosts={modelCosts}
+        avgDurationMs={avgDurationMs}
+        fastPct={fastPct}
+        languageBreakdown={languageBreakdown}
         hasData={otelHasData}
       />
     </div>
