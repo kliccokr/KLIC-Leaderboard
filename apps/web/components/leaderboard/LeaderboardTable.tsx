@@ -63,6 +63,21 @@ function computeSevenDay(pct: number | null, resetsAt: string | null, now: numbe
   return computeWindow(pct, resetsAt, now, 7 * 24 * 60, "7d", formatDH);
 }
 
+function LiveBadge() {
+  return (
+    <span
+      title="최근 5분 이내 활동 중"
+      className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-500"
+    >
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+      </span>
+      LIVE
+    </span>
+  );
+}
+
 function ProgressBar({ pct }: { pct: number }) {
   const clamped = Math.min(100, Math.max(0, pct));
   const color = clamped >= 90 ? "bg-red-500" : clamped >= 70 ? "bg-amber-500" : "bg-emerald-500";
@@ -91,6 +106,7 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
           <Link href={`/${locale}/profile/${entry.email.split("@")[0]}`} className="font-semibold text-foreground hover:underline">
             {entry.name}
           </Link>
+          {entry.isLive && <LiveBadge />}
         </div>
         {levelName && (
           <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{levelName}</span>
@@ -224,9 +240,12 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
                     {entry.rank <= 3 ? ["🥇", "🥈", "🥉"][entry.rank - 1] : `#${entry.rank}`}
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap">
-                    <Link href={`/${locale}/profile/${entry.email.split("@")[0]}`} className="font-medium text-foreground hover:underline">
-                      {entry.name}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/${locale}/profile/${entry.email.split("@")[0]}`} className="font-medium text-foreground hover:underline">
+                        {entry.name}
+                      </Link>
+                      {entry.isLive && <LiveBadge />}
+                    </div>
                     {entry.orgUnit && (
                       <Link href={`/${locale}/team/${encodeURIComponent(entry.orgUnit)}`} className="block text-xs text-muted-foreground hover:underline">
                         {entry.orgUnit}

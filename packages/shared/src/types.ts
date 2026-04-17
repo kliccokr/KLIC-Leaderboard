@@ -84,4 +84,5 @@ export interface LeaderboardEntry {
   fiveHourResetsAt: string | null;
   sevenDayResetsAt: string | null;
   rateLimitUpdatedAt: string | null;
+  isLive: boolean;
 }

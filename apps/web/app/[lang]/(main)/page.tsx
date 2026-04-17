@@ -63,6 +63,7 @@ export default async function LeaderboardPage({
     fiveHourResetsAt: Date | null;
     sevenDayResetsAt: Date | null;
     rateLimitUpdatedAt: Date | null;
+    isLive: boolean;
   }>(sql`
     WITH daily AS (
       SELECT
@@ -90,6 +91,10 @@ export default async function LeaderboardPage({
     ),
     latest AS (
       SELECT user_id, submitted_at FROM ranked WHERE rn = 1
+    ),
+    live AS (
+      SELECT DISTINCT user_id FROM otel_events
+      WHERE observed_at >= now() - interval '5 minutes'
     )
     SELECT
       u.id AS "userId",
@@ -107,10 +112,12 @@ export default async function LeaderboardPage({
       u.seven_day_used_pct AS "sevenDayUsedPct",
       u.five_hour_resets_at AS "fiveHourResetsAt",
       u.seven_day_resets_at AS "sevenDayResetsAt",
-      u.rate_limit_updated_at AS "rateLimitUpdatedAt"
+      u.rate_limit_updated_at AS "rateLimitUpdatedAt",
+      (live.user_id IS NOT NULL) AS "isLive"
     FROM users u
     LEFT JOIN aggregated a ON a.user_id = u.id
     LEFT JOIN latest l ON l.user_id = u.id
+    LEFT JOIN live ON live.user_id = u.id
     ${searchTerm
       ? sql`WHERE (u.name ILIKE '%' || ${searchTerm} || '%' OR u.email ILIKE '%' || ${searchTerm} || '%' OR u.team ILIKE '%' || ${searchTerm} || '%')`
       : sql``}
@@ -136,6 +143,7 @@ export default async function LeaderboardPage({
     fiveHourResetsAt: r.fiveHourResetsAt ? new Date(r.fiveHourResetsAt).toISOString() : null,
     sevenDayResetsAt: r.sevenDayResetsAt ? new Date(r.sevenDayResetsAt).toISOString() : null,
     rateLimitUpdatedAt: r.rateLimitUpdatedAt ? new Date(r.rateLimitUpdatedAt).toISOString() : null,
+    isLive: Boolean(r.isLive),
   }));
 
   const teamMap = new Map<string, { totalTokens: number; totalCost: number; members: number }>();
