@@ -1,10 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { db, users, submissions, userSessions } from "@klic/db";
+import { db, users, submissions, userSessions, otelEvents } from "@klic/db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 import { DashboardPeriodFilter } from "@/components/dashboard/DashboardPeriodFilter";
 import { RefreshButton } from "@/components/dashboard/RefreshButton";
+import { RealtimeSection } from "@/components/dashboard/RealtimeSection";
 import type { DailyBreakdown } from "@klic/shared";
 import { backfillDailyActivity, getPeriodRange } from "@/lib/dashboard-helpers";
 
@@ -177,6 +178,58 @@ export default async function MyDashboardPage({
   // Count registered PCs (distinct sources)
   const pcCount = new Set(userSubmissions.map((s) => s.source)).size;
 
+  // --- Real-time OTel stats (last 24h, KST buckets) ---
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const otelRows = await db.query.otelEvents.findMany({
+    where: and(eq(otelEvents.userId, user.id), gte(otelEvents.observedAt, since24h)),
+    orderBy: (e, { asc }) => [asc(e.observedAt)],
+  });
+
+  const countsByEvent = new Map<string, number>();
+  const hourBuckets: Array<{ hour: string; requests: number; errors: number }> = Array.from(
+    { length: 24 },
+    (_, i) => ({ hour: String(i).padStart(2, "0"), requests: 0, errors: 0 }),
+  );
+  const modelAgg = new Map<string, { cost: number; calls: number }>();
+  let cost24h = 0;
+  let toolAccepts = 0;
+  let toolRejects = 0;
+
+  for (const ev of otelRows) {
+    countsByEvent.set(ev.eventName, (countsByEvent.get(ev.eventName) ?? 0) + 1);
+    const attrs = (ev.attrs ?? {}) as Record<string, unknown>;
+    const kstHour = new Date(ev.observedAt.getTime() + 9 * 60 * 60 * 1000).getUTCHours();
+
+    if (ev.eventName === "api_request") {
+      hourBuckets[kstHour].requests++;
+      const costUsd = typeof attrs.cost_usd === "number" ? attrs.cost_usd : 0;
+      cost24h += costUsd;
+      const model = typeof attrs.model === "string" ? attrs.model : "unknown";
+      const agg = modelAgg.get(model) ?? { cost: 0, calls: 0 };
+      agg.cost += costUsd;
+      agg.calls += 1;
+      modelAgg.set(model, agg);
+    } else if (ev.eventName === "api_error") {
+      hourBuckets[kstHour].errors++;
+    } else if (ev.eventName === "tool_decision") {
+      const decision = attrs.decision;
+      if (decision === "accept") toolAccepts++;
+      else if (decision === "reject") toolRejects++;
+    }
+  }
+
+  const apiCalls24h = countsByEvent.get("api_request") ?? 0;
+  const apiErrors24h = countsByEvent.get("api_error") ?? 0;
+  const prompts24h = countsByEvent.get("user_prompt") ?? 0;
+  const toolDecisions = toolAccepts + toolRejects;
+  const toolAcceptRate = toolDecisions > 0 ? toolAccepts / toolDecisions : null;
+  const activeSessions = new Set(otelRows.map((e) => e.sessionId).filter(Boolean)).size;
+  const modelCosts = [...modelAgg.entries()]
+    .map(([model, v]) => ({ model, cost: v.cost, calls: v.calls }))
+    .sort((a, b) => b.cost - a.cost);
+
+  const otelHasData = otelRows.length > 0;
+
   const stats = [
     { label: "총 토큰", value: fmtTokens(totalTokens) },
     { label: "총 비용", value: `$${totalCost.toFixed(2)}`, tooltip: "API 비용 추정치 (토큰 단가 기준)" },
@@ -215,6 +268,18 @@ export default async function MyDashboardPage({
         taskData={taskData}
         projects={projects}
         sessions={sessionTableData}
+      />
+
+      <RealtimeSection
+        apiCalls24h={apiCalls24h}
+        apiErrors24h={apiErrors24h}
+        prompts24h={prompts24h}
+        cost24h={cost24h}
+        activeSessions={activeSessions}
+        toolAcceptRate={toolAcceptRate}
+        hourlyBuckets={hourBuckets}
+        modelCosts={modelCosts}
+        hasData={otelHasData}
       />
     </div>
   );
