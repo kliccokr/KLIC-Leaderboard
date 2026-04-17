@@ -45,12 +45,13 @@ export default async function AdminPage({
     SELECT
       count(DISTINCT user_id) FILTER (WHERE observed_at >= now() - interval '5 minutes') AS active_users_5m,
       count(*) FILTER (WHERE event_name = 'api_request' AND observed_at >= now() - interval '1 hour') AS api_calls_1h,
-      count(*) FILTER (WHERE event_name = 'api_request' AND observed_at >= now() - interval '24 hours') AS api_calls_24h,
-      count(*) FILTER (WHERE event_name = 'api_error' AND observed_at >= now() - interval '24 hours') AS api_errors_24h,
-      coalesce(sum((attrs->>'cost_usd')::numeric) FILTER (WHERE event_name = 'api_request' AND observed_at >= now() - interval '24 hours'), 0) AS cost_24h,
-      count(*) FILTER (WHERE event_name = 'user_prompt' AND observed_at >= now() - interval '24 hours') AS prompts_24h,
-      count(DISTINCT user_id) FILTER (WHERE observed_at >= now() - interval '24 hours') AS sending_users
+      count(*) FILTER (WHERE event_name = 'api_request') AS api_calls_24h,
+      count(*) FILTER (WHERE event_name = 'api_error') AS api_errors_24h,
+      coalesce(sum((attrs->>'cost_usd')::numeric) FILTER (WHERE event_name = 'api_request'), 0) AS cost_24h,
+      count(*) FILTER (WHERE event_name = 'user_prompt') AS prompts_24h,
+      count(DISTINCT user_id) AS sending_users
     FROM otel_events
+    WHERE observed_at >= now() - interval '24 hours'
   `);
   const rt = realtime[0];
 
