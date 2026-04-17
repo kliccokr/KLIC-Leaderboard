@@ -98,15 +98,9 @@ function EnvBadges({ osTypes, terminalType }: { osTypes: string[]; terminalType:
 
 function LiveBadge() {
   return (
-    <span
-      title="최근 5분 이내 활동 중"
-      className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-500"
-    >
-      <span className="relative flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
-      </span>
-      LIVE
+    <span title="최근 5분 이내 활동 중" className="relative flex h-2 w-2 shrink-0">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
     </span>
   );
 }
@@ -136,10 +130,10 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-lg">{rankLabel}</span>
+          {entry.isLive && <LiveBadge />}
           <Link href={`/${locale}/profile/${entry.email.split("@")[0]}`} className="font-semibold text-foreground hover:underline">
             {entry.name}
           </Link>
-          {entry.isLive && <LiveBadge />}
           <EnvBadges osTypes={entry.osTypes} terminalType={entry.terminalType} />
         </div>
         {levelName && (
@@ -275,10 +269,10 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-2">
+                      {entry.isLive && <LiveBadge />}
                       <Link href={`/${locale}/profile/${entry.email.split("@")[0]}`} className="font-medium text-foreground hover:underline">
                         {entry.name}
                       </Link>
-                      {entry.isLive && <LiveBadge />}
                       <EnvBadges osTypes={entry.osTypes} terminalType={entry.terminalType} />
                     </div>
                     {entry.orgUnit && (
