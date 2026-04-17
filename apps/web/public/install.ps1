@@ -105,6 +105,31 @@ Write-Host ""
 try {
     klic-leaderboard login
     if ($LASTEXITCODE -ne 0) { throw }
+
+    # Configure OTel env vars for Claude Code from saved config
+    $ConfigPath = "$env:USERPROFILE\.klic\leaderboard\config.json"
+    if (Test-Path $ConfigPath) {
+        try {
+            $Cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+            $ApiKey = $Cfg.apiKey
+            $ServerUrl = if ($Cfg.serverUrl) { $Cfg.serverUrl } else { "https://use.klic.co.kr" }
+            if ($ApiKey) {
+                $HostEsc = ($env:COMPUTERNAME -replace '[^A-Za-z0-9._-]', '_')
+                [Environment]::SetEnvironmentVariable("CLAUDE_CODE_ENABLE_TELEMETRY", "1", "User")
+                [Environment]::SetEnvironmentVariable("OTEL_METRICS_EXPORTER", "otlp", "User")
+                [Environment]::SetEnvironmentVariable("OTEL_LOGS_EXPORTER", "otlp", "User")
+                [Environment]::SetEnvironmentVariable("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json", "User")
+                [Environment]::SetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT", "$ServerUrl/api/otel", "User")
+                [Environment]::SetEnvironmentVariable("OTEL_EXPORTER_OTLP_HEADERS", "Authorization=Bearer $ApiKey", "User")
+                [Environment]::SetEnvironmentVariable("OTEL_RESOURCE_ATTRIBUTES", "service.instance.id=$HostEsc", "User")
+                Write-Host "   -> OTel 환경변수 설정 완료 (사용자 환경)" -ForegroundColor Gray
+                Write-Host "   -> 새 터미널을 열고 Claude Code 재시작 필요" -ForegroundColor Gray
+            }
+        } catch {
+            Write-Host "   -> OTel 환경변수 설정 건너뜀" -ForegroundColor Yellow
+        }
+    }
+
     # Login succeeded - start daemon
     Start-ScheduledTask -TaskName $ServiceName
     Write-Host ""

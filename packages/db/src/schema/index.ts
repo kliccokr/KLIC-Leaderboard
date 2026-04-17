@@ -5,3 +5,4 @@ export * from "./submissions";
 export * from "./apiKeys";
 export * from "./badges";
 export * from "./userSessions";
+export * from "./otel";
