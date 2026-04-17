@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { auth } from "@/auth";
 import { db, users, submissions, userBadges, badges, userSessions } from "@klic/db";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { ModelPieChart } from "@/components/profile/ModelPieChart";
 import { LevelProgress } from "@/components/profile/LevelProgress";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
+import { RealtimeSection } from "@/components/dashboard/RealtimeSection";
+import { ApiErrorsTable } from "@/components/dashboard/ApiErrorsTable";
 import type { DailyBreakdown } from "@klic/shared";
 import { backfillDailyActivity, getPeriodRange } from "@/lib/dashboard-helpers";
+import { loadRealtimeStats, loadRecentApiErrors } from "@/lib/otel-realtime";
 
 function fmtTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -188,6 +191,15 @@ export default async function ProfilePage({
   // Count registered PCs (distinct sources)
   const pcCount = new Set(userSubmissions.map((s) => s.source)).size;
 
+  // Viewer can see cost if they're the owner or admin
+  const session = await auth();
+  const isOwner = session?.user?.email === user.email;
+  const isAdmin = session?.user?.role === "admin";
+  const canSeeCost = isOwner || isAdmin;
+
+  const realtimeStats = await loadRealtimeStats(user.id);
+  const recentErrors = canSeeCost ? await loadRecentApiErrors(user.id, 20) : [];
+
   const stats = [
     { label: "총 토큰", value: fmtTokens(totalTokens) },
     { label: "총 비용", value: `$${totalCost.toFixed(2)}`, tooltip: "API 비용 추정치 (토큰 단가 기준)" },
@@ -258,6 +270,9 @@ export default async function ProfilePage({
         projects={projects}
         sessions={sessionTableData}
       />
+
+      <RealtimeSection {...realtimeStats} hideCost={!canSeeCost} />
+      {canSeeCost && <ApiErrorsTable errors={recentErrors} />}
     </div>
   );
 }

@@ -44,6 +44,7 @@ interface Props {
   fastPct: number | null;  // 0..100
   languageBreakdown: LangBucket[];
   hasData: boolean;
+  hideCost?: boolean;
 }
 
 function fmtDuration(ms: number): string {
@@ -85,14 +86,16 @@ export function RealtimeSection(props: Props) {
         <span className="text-xs text-muted-foreground">Claude Code에서 직접 수신</span>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className={`grid grid-cols-2 gap-3 ${props.hideCost ? "md:grid-cols-4" : "md:grid-cols-5"}`}>
         <Card label="API 호출" value={props.apiCalls24h.toLocaleString()} />
         <Card
           label="에러율"
           value={`${errorRate.toFixed(1)}%`}
           sub={`${props.apiErrors24h}건 실패`}
         />
-        <Card label="실시간 비용" value={`$${props.cost24h.toFixed(2)}`} />
+        {!props.hideCost && (
+          <Card label="실시간 비용" value={`$${props.cost24h.toFixed(2)}`} />
+        )}
         <Card label="프롬프트 수" value={props.prompts24h.toLocaleString()} />
         <Card
           label="도구 수락률"
@@ -119,13 +122,17 @@ export function RealtimeSection(props: Props) {
 
       {props.modelCosts.length > 0 && (
         <div className="rounded-lg border border-border p-4 space-y-3">
-          <h3 className="font-medium text-sm text-muted-foreground">모델별 비용 (24h)</h3>
+          <h3 className="font-medium text-sm text-muted-foreground">
+            {props.hideCost ? "모델별 호출 (24h)" : "모델별 비용 (24h)"}
+          </h3>
           <div className="divide-y divide-border">
             {props.modelCosts.map((m) => (
               <div key={m.model} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-foreground">{m.model}</span>
                 <span className="font-mono text-muted-foreground">
-                  ${m.cost.toFixed(2)} · {m.calls.toLocaleString()}회
+                  {props.hideCost
+                    ? `${m.calls.toLocaleString()}회`
+                    : `$${m.cost.toFixed(2)} · ${m.calls.toLocaleString()}회`}
                 </span>
               </div>
             ))}
