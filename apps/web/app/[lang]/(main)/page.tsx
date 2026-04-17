@@ -67,6 +67,8 @@ export default async function LeaderboardPage({
     sevenDayResetsAt: Date | null;
     rateLimitUpdatedAt: Date | null;
     isLive: boolean;
+    osTypes: string[];
+    terminalType: string | null;
   }>(sql`
     WITH otel_daily AS (
       SELECT
@@ -127,6 +129,14 @@ export default async function LeaderboardPage({
     live AS (
       SELECT DISTINCT user_id FROM otel_events
       WHERE observed_at >= now() - interval '5 minutes'
+    ),
+    env AS (
+      SELECT
+        user_id,
+        array_agg(DISTINCT attrs->>'os.type') FILTER (WHERE attrs->>'os.type' IS NOT NULL) AS os_types,
+        (array_agg(attrs->>'terminal.type' ORDER BY observed_at DESC) FILTER (WHERE attrs->>'terminal.type' IS NOT NULL AND attrs->>'terminal.type' != 'non-interactive'))[1] AS terminal_type
+      FROM otel_events
+      GROUP BY user_id
     )
     SELECT
       u.id AS "userId",
@@ -145,11 +155,14 @@ export default async function LeaderboardPage({
       u.five_hour_resets_at AS "fiveHourResetsAt",
       u.seven_day_resets_at AS "sevenDayResetsAt",
       u.rate_limit_updated_at AS "rateLimitUpdatedAt",
-      (live.user_id IS NOT NULL) AS "isLive"
+      (live.user_id IS NOT NULL) AS "isLive",
+      coalesce(env.os_types, '{}') AS "osTypes",
+      env.terminal_type AS "terminalType"
     FROM users u
     LEFT JOIN aggregated a ON a.user_id = u.id
     LEFT JOIN latest l ON l.user_id = u.id
     LEFT JOIN live ON live.user_id = u.id
+    LEFT JOIN env ON env.user_id = u.id
     ${searchTerm
       ? sql`WHERE (u.name ILIKE '%' || ${searchTerm} || '%' OR u.email ILIKE '%' || ${searchTerm} || '%' OR u.team ILIKE '%' || ${searchTerm} || '%')`
       : sql``}
@@ -176,6 +189,8 @@ export default async function LeaderboardPage({
     sevenDayResetsAt: r.sevenDayResetsAt ? new Date(r.sevenDayResetsAt).toISOString() : null,
     rateLimitUpdatedAt: r.rateLimitUpdatedAt ? new Date(r.rateLimitUpdatedAt).toISOString() : null,
     isLive: Boolean(r.isLive),
+    osTypes: Array.isArray(r.osTypes) ? r.osTypes : [],
+    terminalType: r.terminalType ?? null,
   }));
 
   const teamMap = new Map<string, { totalTokens: number; totalCost: number; members: number }>();

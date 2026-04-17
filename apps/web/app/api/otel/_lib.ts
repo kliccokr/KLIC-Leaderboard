@@ -23,7 +23,22 @@ export async function authenticate(req: Request): Promise<AuthContext | null> {
 
 // ─── Email → userId resolution (for org-token requests) ──────────────────────
 
-const ALLOWED_EMAIL_DOMAINS = ["klic.co.kr", "klic.kr"];
+const ALLOWED_EMAIL_DOMAINS = (process.env.OTEL_ALLOWED_EMAIL_DOMAINS ?? "")
+  .split(",")
+  .map((d) => d.trim().toLowerCase())
+  .filter(Boolean);
+
+const EMAIL_ALIASES: Record<string, string> = Object.fromEntries(
+  (process.env.OTEL_EMAIL_ALIASES ?? "")
+    .split(",")
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const [src, dst] = pair.split("=").map((s) => s.trim().toLowerCase());
+      return [src, dst];
+    })
+    .filter(([src, dst]) => src && dst),
+);
 
 export function normalizeOrgEmail(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -32,7 +47,7 @@ export function normalizeOrgEmail(v: unknown): string | null {
   if (at < 1) return null;
   const domain = email.slice(at + 1);
   if (!ALLOWED_EMAIL_DOMAINS.includes(domain)) return null;
-  return email;
+  return EMAIL_ALIASES[email] ?? email;
 }
 
 export async function resolveEmailsToUserIds(emails: string[]): Promise<Map<string, string>> {

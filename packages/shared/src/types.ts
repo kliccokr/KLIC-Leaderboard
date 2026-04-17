@@ -85,4 +85,6 @@ export interface LeaderboardEntry {
   sevenDayResetsAt: string | null;
   rateLimitUpdatedAt: string | null;
   isLive: boolean;
+  osTypes: string[];
+  terminalType: string | null;
 }

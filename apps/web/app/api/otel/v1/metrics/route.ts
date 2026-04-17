@@ -21,18 +21,42 @@ const ACCEPTED_METRICS = new Set([
 ]);
 
 export async function POST(req: Request): Promise<Response> {
-  const auth = await authenticate(req);
-  if (!auth) return Response.json({ error: "Unauthorized" }, { status: 401 });
-
+  const authHeader = req.headers.get("authorization") ?? "";
+  const ua = req.headers.get("user-agent") ?? "";
   const ct = req.headers.get("content-type") ?? "";
+  console.log("[OTEL/metrics] incoming", {
+    authPresent: !!authHeader,
+    authLen: authHeader.length,
+    ua,
+    ct,
+  });
+
+  const auth = await authenticate(req);
+  if (!auth) {
+    console.log("[OTEL/metrics] 401 unauthorized");
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   if (!ct.includes("json")) {
+    console.log("[OTEL/metrics] 415 bad content-type", ct);
     return Response.json({ error: "Only application/json is supported" }, { status: 415 });
   }
 
   const body = await req.json().catch(() => null);
-  if (!body) return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  if (!body) {
+    console.log("[OTEL/metrics] 400 invalid json");
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-  const metrics = extractMetrics(body).filter((m) => ACCEPTED_METRICS.has(m.name));
+  const allMetrics = extractMetrics(body);
+  const metrics = allMetrics.filter((m) => ACCEPTED_METRICS.has(m.name));
+  console.log("[OTEL/metrics] extracted", {
+    kind: auth.kind,
+    total: allMetrics.length,
+    accepted: metrics.length,
+    names: [...new Set(allMetrics.map((m) => m.name))],
+    sampleAttrs: allMetrics[0]?.attrs,
+  });
   if (metrics.length === 0) return Response.json({ partialSuccess: {} });
 
   const rows: {
@@ -73,6 +97,7 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
+  console.log("[OTEL/metrics] inserting", { rows: rows.length });
   if (rows.length > 0) await db.insert(otelMetricPoints).values(rows);
   return Response.json({ partialSuccess: {} });
 }

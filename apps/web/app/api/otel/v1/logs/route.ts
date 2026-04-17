@@ -18,18 +18,42 @@ const ACCEPTED_EVENTS = new Set([
 ]);
 
 export async function POST(req: Request): Promise<Response> {
-  const auth = await authenticate(req);
-  if (!auth) return Response.json({ error: "Unauthorized" }, { status: 401 });
-
+  const authHeader = req.headers.get("authorization") ?? "";
+  const ua = req.headers.get("user-agent") ?? "";
   const ct = req.headers.get("content-type") ?? "";
+  console.log("[OTEL/logs] incoming", {
+    authPresent: !!authHeader,
+    authLen: authHeader.length,
+    ua,
+    ct,
+  });
+
+  const auth = await authenticate(req);
+  if (!auth) {
+    console.log("[OTEL/logs] 401 unauthorized");
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   if (!ct.includes("json")) {
+    console.log("[OTEL/logs] 415 bad content-type", ct);
     return Response.json({ error: "Only application/json is supported" }, { status: 415 });
   }
 
   const body = await req.json().catch(() => null);
-  if (!body) return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  if (!body) {
+    console.log("[OTEL/logs] 400 invalid json");
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-  const events = extractEvents(body).filter((e) => ACCEPTED_EVENTS.has(e.name));
+  const allEvents = extractEvents(body);
+  const events = allEvents.filter((e) => ACCEPTED_EVENTS.has(e.name));
+  console.log("[OTEL/logs] extracted", {
+    kind: auth.kind,
+    total: allEvents.length,
+    accepted: events.length,
+    names: [...new Set(allEvents.map((e) => e.name))],
+    sampleAttrs: allEvents[0]?.attrs,
+  });
   if (events.length === 0) return Response.json({ partialSuccess: {} });
 
   const rows: {
@@ -73,6 +97,7 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
+  console.log("[OTEL/logs] inserting", { rows: rows.length });
   if (rows.length > 0) await db.insert(otelEvents).values(rows);
   return Response.json({ partialSuccess: {} });
 }

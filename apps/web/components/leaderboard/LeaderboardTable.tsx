@@ -63,6 +63,39 @@ function computeSevenDay(pct: number | null, resetsAt: string | null, now: numbe
   return computeWindow(pct, resetsAt, now, 7 * 24 * 60, "7d", formatDH);
 }
 
+function osLabel(os: string): string {
+  if (os === "darwin") return "🍎";
+  if (os === "windows") return "🪟";
+  if (os === "linux") return "🐧";
+  return os;
+}
+
+function terminalLabel(t: string): string {
+  if (t.startsWith("wsl-")) return "WSL";
+  if (t === "vscode") return "VSCode";
+  if (t === "cursor") return "Cursor";
+  if (t === "ssh-session") return "SSH";
+  if (t === "iTerm.app") return "iTerm";
+  if (t === "tmux") return "tmux";
+  return t;
+}
+
+function EnvBadges({ osTypes, terminalType }: { osTypes: string[]; terminalType: string | null }) {
+  if (osTypes.length === 0 && !terminalType) return null;
+  return (
+    <span className="flex items-center gap-1 flex-wrap">
+      {osTypes.map((os) => (
+        <span key={os} title={os} className="text-sm leading-none">{osLabel(os)}</span>
+      ))}
+      {terminalType && (
+        <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1 py-0.5 rounded leading-none">
+          {terminalLabel(terminalType)}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function LiveBadge() {
   return (
     <span
@@ -107,6 +140,7 @@ function MobileCard({ entry, locale, now }: { entry: LeaderboardEntry; locale: s
             {entry.name}
           </Link>
           {entry.isLive && <LiveBadge />}
+          <EnvBadges osTypes={entry.osTypes} terminalType={entry.terminalType} />
         </div>
         {levelName && (
           <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{levelName}</span>
@@ -245,6 +279,7 @@ export function LeaderboardTable({ entries, locale, totalCount }: Props) {
                         {entry.name}
                       </Link>
                       {entry.isLive && <LiveBadge />}
+                      <EnvBadges osTypes={entry.osTypes} terminalType={entry.terminalType} />
                     </div>
                     {entry.orgUnit && (
                       <Link href={`/${locale}/team/${encodeURIComponent(entry.orgUnit)}`} className="block text-xs text-muted-foreground hover:underline">
