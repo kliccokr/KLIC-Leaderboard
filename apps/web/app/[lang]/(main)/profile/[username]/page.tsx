@@ -10,6 +10,7 @@ import { ApiErrorsTable } from "@/components/dashboard/ApiErrorsTable";
 import type { DailyBreakdown } from "@klic/shared";
 import { backfillDailyActivity, getPeriodRange } from "@/lib/dashboard-helpers";
 import { loadRealtimeStats, loadRecentApiErrors } from "@/lib/otel-realtime";
+import { getOtelDailyForUser } from "@/lib/hybrid-daily";
 
 function fmtTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -63,6 +64,13 @@ export default async function ProfilePage({
   const rangeStartStr = rangeStart ? rangeStart.toISOString().slice(0, 10) : null;
   const rangeEndStr = rangeEnd ? rangeEnd.toISOString().slice(0, 10) : null;
 
+  // OTel daily override (hybrid): tokens/cost/models come from OTel api_request
+  // events where present, activity fields stay on JSONL.
+  const otelDaily = await getOtelDailyForUser(
+    user.id,
+    rangeStartStr && rangeEndStr ? { startDate: rangeStartStr, endDate: rangeEndStr } : null,
+  );
+
   // Aggregate daily breakdown (SUM — each PC has its own sessions, no overlap)
   const dailyMap = new Map<string, DailyBreakdown>();
   for (const s of userSubmissions) {
@@ -87,6 +95,35 @@ export default async function ProfilePage({
       }
     }
   }
+
+  for (const [date, otel] of otelDaily) {
+    if (rangeStartStr && date < rangeStartStr) continue;
+    if (rangeEndStr && date > rangeEndStr) continue;
+    const existing = dailyMap.get(date);
+    if (!existing || otel.totalTokens > existing.totalTokens) {
+      const activity = existing
+        ? {
+            linesAdded: existing.linesAdded,
+            linesRemoved: existing.linesRemoved,
+            commitsCount: existing.commitsCount,
+            pullRequestsCount: existing.pullRequestsCount,
+            activeTimeSecs: existing.activeTimeSecs,
+          }
+        : {};
+      dailyMap.set(date, {
+        date,
+        inputTokens: otel.inputTokens,
+        outputTokens: otel.outputTokens,
+        cacheCreationTokens: otel.cacheCreationTokens,
+        cacheReadTokens: otel.cacheReadTokens,
+        totalTokens: otel.totalTokens,
+        totalCost: otel.totalCost,
+        modelsUsed: otel.modelsUsed.length > 0 ? otel.modelsUsed : (existing?.modelsUsed ?? []),
+        ...activity,
+      });
+    }
+  }
+
   const dailyData = [...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date));
 
   // Backfill activity data for old submissions that lack per-day fields

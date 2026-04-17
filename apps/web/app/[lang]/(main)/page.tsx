@@ -45,6 +45,9 @@ export default async function LeaderboardPage({
   const submissionFilter = range
     ? sql`date_range_start <= ${range.end} AND date_range_end >= ${range.start}`
     : sql`1=1`;
+  const otelPeriodFilter = range
+    ? sql`observed_at::date BETWEEN ${range.start}::date AND ${range.end}::date`
+    : sql`1=1`;
 
   const rows = await db.execute<{
     userId: string;
@@ -65,7 +68,23 @@ export default async function LeaderboardPage({
     rateLimitUpdatedAt: Date | null;
     isLive: boolean;
   }>(sql`
-    WITH daily AS (
+    WITH otel_daily AS (
+      SELECT
+        user_id,
+        observed_at::date AS day_date,
+        SUM(
+          COALESCE((attrs->>'input_tokens')::bigint, 0)
+          + COALESCE((attrs->>'output_tokens')::bigint, 0)
+          + COALESCE((attrs->>'cache_creation_tokens')::bigint, 0)
+          + COALESCE((attrs->>'cache_read_tokens')::bigint, 0)
+        ) AS day_tokens,
+        COALESCE(SUM((attrs->>'cost_usd')::numeric), 0) AS day_cost
+      FROM otel_events
+      WHERE event_name = 'api_request'
+        AND ${otelPeriodFilter}
+      GROUP BY user_id, observed_at::date
+    ),
+    jsonl_daily AS (
       SELECT
         s.user_id,
         (day->>'date')::date AS day_date,
@@ -75,6 +94,19 @@ export default async function LeaderboardPage({
            jsonb_array_elements(s.daily_breakdown) AS day
       WHERE ${submissionFilter}
         AND ${periodFilter}
+    ),
+    daily AS (
+      -- Per (user, day): take max of otel and jsonl so we use whichever source
+      -- is more complete. OTel undercounts during partial-coverage days
+      -- (user set it up mid-day); JSONL can be up to 1h stale.
+      SELECT
+        COALESCE(o.user_id, j.user_id) AS user_id,
+        COALESCE(o.day_date, j.day_date) AS day_date,
+        GREATEST(COALESCE(o.day_tokens, 0), COALESCE(j.day_tokens, 0)) AS day_tokens,
+        GREATEST(COALESCE(o.day_cost, 0), COALESCE(j.day_cost, 0)) AS day_cost
+      FROM otel_daily o
+      FULL OUTER JOIN jsonl_daily j
+        ON o.user_id = j.user_id AND o.day_date = j.day_date
     ),
     aggregated AS (
       SELECT

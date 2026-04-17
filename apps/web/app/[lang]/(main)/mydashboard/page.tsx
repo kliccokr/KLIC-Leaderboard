@@ -10,6 +10,7 @@ import { ApiErrorsTable } from "@/components/dashboard/ApiErrorsTable";
 import type { DailyBreakdown } from "@klic/shared";
 import { backfillDailyActivity, getPeriodRange } from "@/lib/dashboard-helpers";
 import { loadRealtimeStats, loadRecentApiErrors } from "@/lib/otel-realtime";
+import { getOtelDailyForUser } from "@/lib/hybrid-daily";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,14 @@ export default async function MyDashboardPage({
   const rangeStart = range ? range.start.toISOString().slice(0, 10) : null;
   const rangeEnd = range ? range.end.toISOString().slice(0, 10) : null;
 
+  // OTel daily override (hybrid): for any day the user has api_request events,
+  // OTel's numbers replace JSONL's for tokens/cost/models. Activity fields
+  // (commits/PRs/lines/active_time) continue to come from JSONL.
+  const otelDaily = await getOtelDailyForUser(
+    user.id,
+    rangeStart && rangeEnd ? { startDate: rangeStart, endDate: rangeEnd } : null,
+  );
+
   // Aggregate daily breakdown (SUM — each PC has its own sessions, no overlap)
   const dailyMap = new Map<string, DailyBreakdown>();
   for (const sub of userSubmissions) {
@@ -86,6 +95,38 @@ export default async function MyDashboardPage({
       }
     }
   }
+
+  // Per-day hybrid: use OTel only if its totalTokens exceeds JSONL's. OTel can
+  // undercount on partial-coverage days, so picking the larger side keeps us
+  // from silently dropping tokens. Activity fields stay as JSONL set them.
+  for (const [date, otel] of otelDaily) {
+    if (rangeStart && date < rangeStart) continue;
+    if (rangeEnd && date > rangeEnd) continue;
+    const existing = dailyMap.get(date);
+    if (!existing || otel.totalTokens > existing.totalTokens) {
+      const activity = existing
+        ? {
+            linesAdded: existing.linesAdded,
+            linesRemoved: existing.linesRemoved,
+            commitsCount: existing.commitsCount,
+            pullRequestsCount: existing.pullRequestsCount,
+            activeTimeSecs: existing.activeTimeSecs,
+          }
+        : {};
+      dailyMap.set(date, {
+        date,
+        inputTokens: otel.inputTokens,
+        outputTokens: otel.outputTokens,
+        cacheCreationTokens: otel.cacheCreationTokens,
+        cacheReadTokens: otel.cacheReadTokens,
+        totalTokens: otel.totalTokens,
+        totalCost: otel.totalCost,
+        modelsUsed: otel.modelsUsed.length > 0 ? otel.modelsUsed : (existing?.modelsUsed ?? []),
+        ...activity,
+      });
+    }
+  }
+
   const dailyData = [...dailyMap.values()].sort((a, b) => a.date.localeCompare(b.date));
 
   // Backfill activity data for old submissions that lack per-day fields
